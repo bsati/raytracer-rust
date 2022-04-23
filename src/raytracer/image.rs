@@ -3,18 +3,18 @@ use std::io::Write;
 
 #[derive(Debug)]
 pub struct Color {
-    r: f32,
-    g: f32,
-    b: f32,
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
 }
 
 impl Color {
-    fn new(r: f32, g: f32, b: f32) -> Color {
+    pub fn new(r: f32, g: f32, b: f32) -> Color {
         Color { r: r, g: g, b: b }
     }
 
     #[inline]
-    fn to_output(&self) -> [i32; 3] {
+    pub fn to_output(&self) -> [i32; 3] {
         [
             (255.999 * self.r) as i32,
             (255.999 * self.g) as i32,
