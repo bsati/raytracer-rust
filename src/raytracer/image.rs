@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Color {
     pub r: f64,
     pub g: f64,
@@ -45,24 +46,22 @@ impl Image {
     }
 
     pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
-        self.pixel_colors[self.get_index(x, y)] = color;
+        let index = self.get_index(x, y);
+        self.pixel_colors[index] = color;
     }
 
     pub fn write_image(&self, output_path: &std::path::Path) {
         let mut file = fs::File::create(output_path).unwrap();
-        write!(file, format!("P3\n{} {}\n255\n", W, H));
+        write!(file, "P3\n{} {}\n255\n", self.width, self.height);
         for i in 0..self.width {
             for j in 0..self.height {
                 let output_color = self.pixel_colors[self.get_index(i, j)].to_output();
                 writeln!(
                     file,
-                    format!(
-                        "{} {} {}",
-                        output_color[0], output_color[1], output_color[2]
-                    )
+                    "{} {} {}",
+                    output_color[0], output_color[1], output_color[2]
                 );
             }
         }
-        file.flush();
     }
 }
