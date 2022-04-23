@@ -1,5 +1,6 @@
 use crate::math::Vector3;
 use crate::raytracer::image::Color;
+use crate::raytracer::raytrace::Ray;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -65,4 +66,15 @@ pub struct Material {
     pub specular_color: Color,
     pub shininess: f64,
     pub mirror: f64,
+}
+
+pub struct Intersection {
+    pub point: Vector3,
+    pub normal: Vector3,
+    pub diffuse: Vector3,
+    pub t: f64,
+}
+
+pub trait Intersectable {
+    fn intersect(ray: &Ray) -> Option<Intersection>;
 }
