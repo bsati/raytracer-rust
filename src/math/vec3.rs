@@ -2,17 +2,17 @@ use std::ops;
 
 #[derive(Debug, Clone)]
 pub struct Vector3 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 impl Vector3 {
-    pub fn new(x: f32, y: f32, z: f32) -> Vector3 {
+    pub fn new(x: f64, y: f64, z: f64) -> Vector3 {
         Vector3 { x: x, y: y, z: z }
     }
 
-    pub fn from_scalar(scalar: f32) -> Vector3 {
+    pub fn from_scalar(scalar: f64) -> Vector3 {
         Vector3 {
             x: scalar,
             y: scalar,
@@ -21,17 +21,17 @@ impl Vector3 {
     }
 
     #[inline]
-    pub fn dot(&self, other: &Vector3) -> f32 {
+    pub fn dot(&self, other: &Vector3) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
     #[inline]
-    pub fn len(&self) -> f32 {
-        f32::sqrt(self.sqr_len())
+    pub fn len(&self) -> f64 {
+        f64::sqrt(self.sqr_len())
     }
 
     #[inline]
-    pub fn sqr_len(&self) -> f32 {
+    pub fn sqr_len(&self) -> f64 {
         self.dot(self)
     }
 
@@ -82,25 +82,25 @@ impl ops::Sub<Vector3> for Vector3 {
 }
 
 impl ops::Mul<Vector3> for Vector3 {
-    type Output = f32;
+    type Output = f64;
 
-    fn mul(self, rhs: Vector3) -> f32 {
+    fn mul(self, rhs: Vector3) -> f64 {
         self.dot(&rhs)
     }
 }
 
-impl ops::Mul<f32> for Vector3 {
+impl ops::Mul<f64> for Vector3 {
     type Output = Vector3;
 
-    fn mul(self, rhs: f32) -> Vector3 {
+    fn mul(self, rhs: f64) -> Vector3 {
         Vector3::new(self.x * rhs, self.y * rhs, self.z * rhs)
     }
 }
 
-impl ops::Div<f32> for Vector3 {
+impl ops::Div<f64> for Vector3 {
     type Output = Vector3;
 
-    fn div(self, rhs: f32) -> Vector3 {
+    fn div(self, rhs: f64) -> Vector3 {
         Vector3::new(self.x / rhs, self.y / rhs, self.z / rhs)
     }
 }

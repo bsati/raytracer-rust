@@ -13,7 +13,7 @@ impl Camera {
         eye: math::Vector3,
         look_at: math::Vector3,
         up: math::Vector3,
-        fovy: f32,
+        fovy: f64,
         width: usize,
         height: usize,
     ) -> Camera {
@@ -21,14 +21,14 @@ impl Camera {
         let distance = view_vec.len();
         let view = view_vec / distance;
 
-        let image_height = 2.0 * distance * (0.5 * fovy / 180.0 * std::f32::consts::PI).tan();
-        let image_width = width as f32 / height as f32 * image_height;
+        let image_height = 2.0 * distance * (0.5 * fovy / 180.0 * std::f64::consts::PI).tan();
+        let image_width = width as f64 / height as f64 * image_height;
 
-        let horizontal = view.cross(&up).normalized() * image_width / width as f32;
-        let vertical = horizontal.cross(&view).normalized() * image_height / height as f32;
+        let horizontal = view.cross(&up).normalized() * image_width / width as f64;
+        let vertical = horizontal.cross(&view).normalized() * image_height / height as f64;
 
         let lower_left =
-            look_at - horizontal * (0.5 * width as f32) - vertical * (0.5 * height as f32);
+            look_at - horizontal * (0.5 * width as f64) - vertical * (0.5 * height as f64);
 
         Camera {
             eye: eye,
@@ -38,7 +38,7 @@ impl Camera {
         }
     }
 
-    pub fn spawn_ray(&self, x: f32, y: f32) -> Ray {
+    pub fn spawn_ray(&self, x: f64, y: f64) -> Ray {
         Ray::new(
             self.eye,
             self.lower_left + self.horizontal * x + self.vertical * y - self.eye,

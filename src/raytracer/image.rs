@@ -3,13 +3,13 @@ use std::io::Write;
 
 #[derive(Debug)]
 pub struct Color {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
+    pub r: f64,
+    pub g: f64,
+    pub b: f64,
 }
 
 impl Color {
-    pub fn new(r: f32, g: f32, b: f32) -> Color {
+    pub fn new(r: f64, g: f64, b: f64) -> Color {
         Color { r: r, g: g, b: b }
     }
 
@@ -24,27 +24,36 @@ impl Color {
 }
 
 #[derive(Debug)]
-pub struct Image<const W: usize, const H: usize> {
-    pixel_colors: [[Color; W]; H],
+pub struct Image {
+    width: usize,
+    height: usize,
+    pixel_colors: Vec<Color>,
 }
 
-impl<const W: usize, const H: usize> Image<W, H> {
-    pub fn new(pixel_colors: [[Color; W]; H]) -> Image<W, H> {
+impl Image {
+    pub fn new(width: usize, height: usize) -> Image {
         Image {
-            pixel_colors: pixel_colors,
+            width: width,
+            height: height,
+            pixel_colors: Vec::with_capacity(width * height),
         }
     }
 
+    #[inline]
+    fn get_index(&self, x: usize, y: usize) -> usize {
+        y * self.width + x
+    }
+
     pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
-        self.pixel_colors[y][x] = color;
+        self.pixel_colors[self.get_index(x, y)] = color;
     }
 
     pub fn write_image(&self, output_path: &std::path::Path) {
         let mut file = fs::File::create(output_path).unwrap();
         write!(file, format!("P3\n{} {}\n255\n", W, H));
-        for i in 0..W {
-            for j in 0..H {
-                let output_color = self.pixel_colors[j][i].to_output();
+        for i in 0..self.width {
+            for j in 0..self.height {
+                let output_color = self.pixel_colors[self.get_index(i, j)].to_output();
                 writeln!(
                     file,
                     format!(
