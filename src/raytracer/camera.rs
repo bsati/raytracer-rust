@@ -1,6 +1,8 @@
 use crate::math;
+use crate::raytracer::raytrace::Ray;
 
 pub struct Camera {
+    eye: math::Vector3,
     horizontal: math::Vector3,
     vertical: math::Vector3,
     lower_left: math::Vector3,
@@ -29,9 +31,17 @@ impl Camera {
             look_at - horizontal * (0.5 * width as f32) - vertical * (0.5 * height as f32);
 
         Camera {
+            eye: eye,
             horizontal: horizontal,
             vertical: vertical,
             lower_left: lower_left,
         }
+    }
+
+    pub fn spawn_ray(&self, x: f32, y: f32) -> Ray {
+        Ray::new(
+            self.eye,
+            self.lower_left + self.horizontal * x + self.vertical * y - self.eye,
+        )
     }
 }
