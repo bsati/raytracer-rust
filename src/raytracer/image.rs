@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Write;
 
 /// Struct representation of RGB-Colors
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Color {
     pub r: f64,
     pub g: f64,
@@ -77,8 +77,10 @@ impl Image {
     ///
     /// * `output_path` Path specifying the output file to write to (will be created if it doesn't exist and overriden if it exists)
     pub fn write_image(&self, output_path: &std::path::Path) {
+        let parent_dir = output_path.parent().unwrap();
+        fs::create_dir_all(parent_dir).unwrap();
         let mut file = fs::File::create(output_path).unwrap();
-        write!(file, "P3\n{} {}\n255\n", self.width, self.height);
+        write!(file, "P3\n{} {}\n255\n", self.width, self.height).unwrap();
         for i in 0..self.width {
             for j in 0..self.height {
                 let output_color = self.pixel_colors[self.get_index(i, j)].to_output();
@@ -86,7 +88,8 @@ impl Image {
                     file,
                     "{} {} {}",
                     output_color[0], output_color[1], output_color[2]
-                );
+                )
+                .unwrap();
             }
         }
     }

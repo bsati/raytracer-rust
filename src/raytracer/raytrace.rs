@@ -10,8 +10,8 @@ use std::path;
 /// A ray consists of an origin point `o` and a direction `d`. It's position can therefore
 /// be calculated for any timestep `t` by `o + t * d`
 pub struct Ray {
-    origin: math::Vector3,
-    direction: math::Vector3,
+    pub origin: math::Vector3,
+    pub direction: math::Vector3,
 }
 
 impl Ray {
@@ -29,7 +29,7 @@ impl Ray {
     }
 
     /// Evaluates the ray at timestep `t`
-    fn at_timestep(&self, t: f64) -> math::Vector3 {
+    pub fn at_timestep(&self, t: f64) -> math::Vector3 {
         self.origin + self.direction * t
     }
 
