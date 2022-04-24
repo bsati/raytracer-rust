@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::ops::{AddAssign, Mul};
 
 /// Struct representation of RGB-Colors
@@ -32,11 +32,11 @@ impl Color {
 
     /// Converts the current value to PPM compatible output values contained in an integer array.
     #[inline]
-    pub fn to_output(&self) -> [i32; 3] {
+    pub fn to_output(&self) -> [u8; 3] {
         [
-            (255.999 * self.r) as i32,
-            (255.999 * self.g) as i32,
-            (255.999 * self.b) as i32,
+            (255.999 * self.r) as u8,
+            (255.999 * self.g) as u8,
+            (255.999 * self.b) as u8,
         ]
     }
 }
@@ -85,7 +85,7 @@ impl Image {
         Image {
             width: width,
             height: height,
-            pixel_colors: Vec::with_capacity(width * height),
+            pixel_colors: vec![Color::new(0.0, 0.0, 0.0); width * height],
         }
     }
 
@@ -99,10 +99,21 @@ impl Image {
 
     /// Sets the Color of the Image pixel at coordinates `x` and `y` to the given `color`.
     pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
-        self.pixel_colors.push(color);
+        let idx = self.get_index(y, x);
+        self.pixel_colors[idx] = color;
     }
 
-    /// Writes the current Image data (Pixel colors) to a PPM file at the given `output_path`.
+    #[inline]
+    fn to_u8_buf(&self) -> Box<[u8]> {
+        let result: Vec<u8> = self
+            .pixel_colors
+            .iter()
+            .flat_map(|&c| c.to_output())
+            .collect();
+        result.into_boxed_slice()
+    }
+
+    /// Writes the current Image data (Pixel colors) to a png file at the given `output_path`.
     ///
     /// # Arguments
     ///
@@ -110,10 +121,21 @@ impl Image {
     pub fn write_image(&self, output_path: &std::path::Path) {
         let parent_dir = output_path.parent().unwrap();
         fs::create_dir_all(parent_dir).unwrap();
+        let file = fs::File::create(output_path).unwrap();
+        let ref mut w = BufWriter::new(file);
+        let mut encoder = png::Encoder::new(w, self.width as u32, self.height as u32);
+        encoder.set_color(png::ColorType::Rgb);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&*self.to_u8_buf()).unwrap();
+    }
+
+    pub fn write_image_ppm(&self, output_path: &std::path::Path) {
+        let parent_dir = output_path.parent().unwrap();
+        fs::create_dir_all(parent_dir).unwrap();
         let mut file = fs::File::create(output_path).unwrap();
         write!(file, "P3\n{} {}\n255\n", self.width, self.height).unwrap();
-        for i in 0..self.width {
-            for j in 0..self.height {
+        for j in 0..self.height {
+            for i in 0..self.width {
                 let output_color = self.pixel_colors[self.get_index(i, j)].to_output();
                 writeln!(
                     file,

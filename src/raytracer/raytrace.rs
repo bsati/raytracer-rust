@@ -25,7 +25,7 @@ impl Ray {
     pub fn new(origin: Vector3, direction: Vector3) -> Ray {
         Ray {
             origin: origin,
-            direction: direction,
+            direction: direction.normalized(),
         }
     }
 
@@ -44,7 +44,7 @@ impl Ray {
     fn trace(&self, scene_config: &scene::SceneConfig, depth: u8) -> Color {
         let intersection = scene_config.scene.get_closest_interesection(self);
         if let Some(intersection_info) = intersection {
-            let mut color = scene_config.scene.compute_phong_lighting(
+            let color = scene_config.scene.compute_phong_lighting(
                 &intersection_info.point,
                 &intersection_info.normal,
                 &-self.direction,
