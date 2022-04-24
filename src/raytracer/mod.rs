@@ -3,4 +3,4 @@ mod image;
 mod raytrace;
 mod scene;
 
-pub use raytrace::compute_image;
+pub use raytrace::{compute_image, SuperSampling};

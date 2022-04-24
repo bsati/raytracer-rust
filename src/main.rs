@@ -23,5 +23,10 @@ fn main() {
     // raytracer::compute_image(args.depth, scene_path, output_path);
     let scene_path = path::Path::new("./scenes/spheres.yaml");
     let output_path = path::Path::new("./outputs/spheres.png");
-    raytracer::compute_image(5, scene_path, output_path);
+    raytracer::compute_image(
+        raytracer::SuperSampling::Uniform(4),
+        5,
+        scene_path,
+        output_path,
+    );
 }

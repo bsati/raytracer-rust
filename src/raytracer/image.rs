@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufWriter, Write};
-use std::ops::{Add, AddAssign, Mul};
+use std::ops::{Add, AddAssign, DivAssign, Mul};
 
 /// Struct representation of RGB-Colors
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -54,6 +54,14 @@ impl AddAssign<Color> for Color {
         self.r += rhs.r;
         self.g += rhs.g;
         self.b += rhs.b;
+    }
+}
+
+impl DivAssign<f64> for Color {
+    fn div_assign(&mut self, rhs: f64) {
+        self.r /= rhs;
+        self.g /= rhs;
+        self.b /= rhs;
     }
 }
 

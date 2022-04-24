@@ -67,15 +67,46 @@ impl Ray {
     }
 }
 
+pub enum SuperSampling {
+    Uniform(u8),
+}
+
+fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
+    let step: f64 = 1.0 / resolution as f64;
+    let mut samples = Vec::with_capacity((resolution * resolution) as usize);
+    for i in 0..resolution {
+        for j in 0..resolution {
+            samples.push((base_x + i as f64 * step, base_y + j as f64 * step));
+        }
+    }
+    samples
+}
+
+impl SuperSampling {
+    fn sample(&self, x: usize, y: usize) -> Vec<(f64, f64)> {
+        match self {
+            SuperSampling::Uniform(resolution) => {
+                uniform_grid_sampling(*resolution, x as f64, y as f64)
+            }
+        }
+    }
+}
+
 /// Computes the image for a given scene config (loaded from `scene_path`) by raytracing and saves it to the specified `output_path`.
 /// For more details on scene configs see [Scene](crate::raytracer::scene::Scene).
 ///
 /// # Arguments
 ///
+/// * `ssaa` Algorithm to use for super sampling anti aliasing
 /// * `depth` determines the maximum ray bounce / tracing recursion depth
 /// * `scene_path` Path to the scene file determining the needed properties for raytracing
 /// * `output_path` Path of the output image file
-pub fn compute_image(depth: u8, scene_path: &path::Path, output_path: &path::Path) {
+pub fn compute_image(
+    ssaa: SuperSampling,
+    depth: u8,
+    scene_path: &path::Path,
+    output_path: &path::Path,
+) {
     let scene_file = fs::File::open(scene_path).unwrap();
     let scene_config: scene::SceneConfig = serde_yaml::from_reader(scene_file).unwrap();
 
@@ -90,8 +121,14 @@ pub fn compute_image(depth: u8, scene_path: &path::Path, output_path: &path::Pat
     );
     for i in 0..scene_config.image.width {
         for j in 0..scene_config.image.height {
-            let ray = camera.spawn_ray(i as f64, j as f64);
-            let mut pixel_color = ray.trace(&scene_config, 0, depth);
+            let samples = ssaa.sample(i, j);
+            let mut pixel_color = image::Color::new(0.0, 0.0, 0.0);
+            let count = samples.len();
+            for sample in samples {
+                let ray = camera.spawn_ray(sample.0, sample.1);
+                pixel_color += ray.trace(&scene_config, 0, depth);
+            }
+            pixel_color /= count as f64;
             pixel_color.clamp();
             img.set_pixel_color(i, j, pixel_color);
         }
