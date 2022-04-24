@@ -4,10 +4,10 @@ use crate::raytracer::raytrace::Ray;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub struct Scene {
+pub struct SceneConfig {
     pub image: ImageConfig,
     pub camera: CameraConfig,
-    pub scene: SceneConfig,
+    pub scene: Scene,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -26,10 +26,98 @@ pub struct CameraConfig {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct SceneConfig {
+pub struct Scene {
     pub ambient_light: Color,
     pub lights: Vec<Light>,
     pub objects: Vec<Object>,
+}
+
+impl Scene {
+    /// Returns the closest intersection of the ray with an object of the scene if there is any.
+    ///
+    /// # Arguments
+    ///
+    /// * `ray` the ray for which to check intersections
+    pub fn get_closest_interesection(&self, ray: &Ray) -> Option<IntersectionInfo> {
+        let mut info: Option<IntersectionInfo> = None;
+
+        for o in &self.objects {
+            let intersection = o.intersect(ray);
+            if let Some(intersection_info) = intersection {
+                match info {
+                    Some(i) => {
+                        if i.t > intersection_info.t {
+                            info = Some(intersection_info)
+                        }
+                    }
+                    None => info = Some(intersection_info),
+                }
+            }
+        }
+        info
+    }
+
+    /// Returns whether a given point should be colored with diffuse and specular color.
+    ///
+    /// Depends on whether the point is being shadowed by another object or not.
+    /// For a light `l` and point `p` the ray is constructed as `origin = p` and `direction = ||l.position - p||`.
+    /// If `p` is being shadowed there has to be an intersection `i` with object `o` where `||l.position - p|| > ||l.position - i.position||`
+    ///
+    /// # Arguments
+    ///
+    /// * `point` the point to check
+    /// * `lp_vec` vector from point to light
+    /// * `lp_vec_normalized` `lp_vec` normalized
+    #[inline]
+    fn should_color(&self, point: &Vector3, lp_vec: &Vector3, lp_vec_normalized: &Vector3) -> bool {
+        let ray = Ray::new(*point, *lp_vec_normalized);
+        let shadow_intersection = self.get_closest_interesection(&ray);
+        match shadow_intersection {
+            Some(info) => {
+                let len = (info.point - *point).sqr_len();
+                len < 1e-4 || len > lp_vec.sqr_len()
+            }
+            None => true,
+        }
+    }
+
+    /// Computes the color of a point on an object from the given view via the Phong Lighting Model.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` Point in space to calculate the color for
+    /// * `normal` Normal of the object intersection
+    /// * `view` Position where the point / object is being viewed from
+    /// * `material` Material of the hit object
+    pub fn compute_phong_lighting(
+        &self,
+        point: &Vector3,
+        normal: &Vector3,
+        view: &Vector3,
+        material: &Material,
+    ) -> Color {
+        let mut c = material.ambient_color * self.ambient_light;
+
+        for l in &self.lights {
+            let lp_vec = l.position - *point;
+            let lp_vec_normalized = lp_vec.normalized();
+            if self.should_color(point, &lp_vec, &lp_vec_normalized) {
+                let r = lp_vec_normalized.mirror(normal);
+                let dot_l = normal.dot(&lp_vec_normalized);
+                if dot_l >= 0.0 {
+                    c += l.color * (material.diffuse_color * dot_l);
+
+                    let dot_r = view.dot(&r);
+                    if dot_r >= 0.0 {
+                        let shininess = dot_r.powf(material.shininess);
+                        c += material.specular_color * l.color * shininess;
+                    }
+                }
+            }
+        }
+
+        c
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,7 +147,7 @@ pub struct Plane {
     pub material: Material,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct Material {
     pub ambient_color: Color,
     pub diffuse_color: Color,
@@ -69,20 +157,21 @@ pub struct Material {
 }
 
 /// Information about a ray-object intersection.
-/// Contains the intersection point, normal, diffuse color and the `t` for which the intersection occurs.
+/// Contains the intersection point, normal, material of the intersected object and the `t` for which the intersection occurs.
+#[derive(Clone, Copy)]
 pub struct IntersectionInfo {
     pub point: Vector3,
     pub normal: Vector3,
-    pub diffuse: Color,
+    pub material: Material,
     pub t: f64,
 }
 
 impl IntersectionInfo {
-    fn new(point: Vector3, normal: Vector3, color: Color, t: f64) -> IntersectionInfo {
+    fn new(point: Vector3, normal: Vector3, material: Material, t: f64) -> IntersectionInfo {
         IntersectionInfo {
             point: point,
             normal: normal,
-            diffuse: color,
+            material: material,
             t: t,
         }
     }
@@ -137,7 +226,7 @@ impl Intersectable for Sphere {
             return Some(IntersectionInfo::new(
                 intersection_point,
                 intersection_normal,
-                self.material.diffuse_color,
+                self.material,
                 intersection_t,
             ));
         }
@@ -163,7 +252,7 @@ impl Intersectable for Plane {
         Some(IntersectionInfo::new(
             intersection_point,
             intersection_normal,
-            self.material.diffuse_color,
+            self.material,
             intersection_t,
         ))
     }

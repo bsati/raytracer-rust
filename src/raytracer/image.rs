@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
+use std::ops::{AddAssign, Mul};
 
 /// Struct representation of RGB-Colors
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -22,6 +23,13 @@ impl Color {
         Color { r: r, g: g, b: b }
     }
 
+    /// Clamps the color to a maximum of `1.0` to avoid over-saturation
+    pub fn clamp(&mut self) {
+        self.r = f64::min(self.r, 1.0);
+        self.g = f64::min(self.g, 1.0);
+        self.b = f64::min(self.b, 1.0);
+    }
+
     /// Converts the current value to PPM compatible output values contained in an integer array.
     #[inline]
     pub fn to_output(&self) -> [i32; 3] {
@@ -30,6 +38,30 @@ impl Color {
             (255.999 * self.g) as i32,
             (255.999 * self.b) as i32,
         ]
+    }
+}
+
+impl AddAssign<Color> for Color {
+    fn add_assign(&mut self, rhs: Color) {
+        self.r += rhs.r;
+        self.g += rhs.g;
+        self.b += rhs.b;
+    }
+}
+
+impl Mul<Color> for Color {
+    type Output = Color;
+
+    fn mul(self, rhs: Color) -> Color {
+        Color::new(self.r * rhs.r, self.g * rhs.g, self.b * rhs.b)
+    }
+}
+
+impl Mul<f64> for Color {
+    type Output = Color;
+
+    fn mul(self, rhs: f64) -> Color {
+        Color::new(self.r * rhs, self.g * rhs, self.b * rhs)
     }
 }
 
@@ -67,8 +99,7 @@ impl Image {
 
     /// Sets the Color of the Image pixel at coordinates `x` and `y` to the given `color`.
     pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
-        let index = self.get_index(x, y);
-        self.pixel_colors[index] = color;
+        self.pixel_colors.push(color);
     }
 
     /// Writes the current Image data (Pixel colors) to a PPM file at the given `output_path`.

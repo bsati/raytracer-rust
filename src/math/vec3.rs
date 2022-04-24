@@ -94,6 +94,16 @@ impl Vector3 {
         }
         self
     }
+
+    /// Constructs a new vector as a mirrored version of `self` along the normal `n`.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` Normal acting as mirror axis
+    #[inline]
+    pub fn mirror(&self, n: &Vector3) -> Vector3 {
+        return *n * (2.0 * self.dot(n)) - *self;
+    }
 }
 
 /// Add implementation for Vector + Vector
@@ -138,5 +148,13 @@ impl ops::Div<f64> for Vector3 {
 
     fn div(self, rhs: f64) -> Vector3 {
         Vector3::new(self.x / rhs, self.y / rhs, self.z / rhs)
+    }
+}
+
+impl ops::Neg for Vector3 {
+    type Output = Vector3;
+
+    fn neg(self) -> Vector3 {
+        Vector3::new(-self.x, -self.y, -self.z)
     }
 }
