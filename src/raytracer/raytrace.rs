@@ -42,6 +42,10 @@ impl Ray {
     /// * `depth` if the material of the object is mirroring, depth defines the recursion depth for which to spawn
     ///           secondary rays
     fn trace(&self, scene_config: &scene::SceneConfig, current_depth: u8, max_depth: u8) -> Color {
+        if current_depth == max_depth {
+            return Color::new(0.0, 0.0, 0.0);
+        }
+
         let intersection = scene_config.scene.get_closest_interesection(self);
         if let Some(intersection_info) = intersection {
             let mut color = scene_config.scene.compute_phong_lighting(
@@ -129,6 +133,10 @@ pub fn compute_image(
                 pixel_color += ray.trace(&scene_config, 0, depth);
             }
             pixel_color /= count as f64;
+            // Gamma adjustment
+            pixel_color.r = f64::sqrt(pixel_color.r);
+            pixel_color.g = f64::sqrt(pixel_color.g);
+            pixel_color.b = f64::sqrt(pixel_color.b);
             pixel_color.clamp();
             img.set_pixel_color(i, j, pixel_color);
         }
