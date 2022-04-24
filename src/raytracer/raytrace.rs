@@ -41,15 +41,25 @@ impl Ray {
     /// * `scene_config` Configuration of the scene
     /// * `depth` if the material of the object is mirroring, depth defines the recursion depth for which to spawn
     ///           secondary rays
-    fn trace(&self, scene_config: &scene::SceneConfig, depth: u8) -> Color {
+    fn trace(&self, scene_config: &scene::SceneConfig, current_depth: u8, max_depth: u8) -> Color {
         let intersection = scene_config.scene.get_closest_interesection(self);
         if let Some(intersection_info) = intersection {
-            let color = scene_config.scene.compute_phong_lighting(
+            let mut color = scene_config.scene.compute_phong_lighting(
                 &intersection_info.point,
                 &intersection_info.normal,
                 &-self.direction,
                 &intersection_info.material,
             );
+
+            if intersection_info.material.mirror > 0.0 {
+                let reflected_ray = Ray::new(
+                    intersection_info.point,
+                    self.direction.reflect(&intersection_info.normal),
+                );
+                color = color * (1.0 - intersection_info.material.mirror)
+                    + reflected_ray.trace(scene_config, current_depth + 1, max_depth)
+                        * intersection_info.material.mirror;
+            }
 
             return color;
         }
@@ -81,7 +91,7 @@ pub fn compute_image(depth: u8, scene_path: &path::Path, output_path: &path::Pat
     for i in 0..scene_config.image.width {
         for j in 0..scene_config.image.height {
             let ray = camera.spawn_ray(i as f64, j as f64);
-            let mut pixel_color = ray.trace(&scene_config, depth);
+            let mut pixel_color = ray.trace(&scene_config, 0, depth);
             pixel_color.clamp();
             img.set_pixel_color(i, j, pixel_color);
         }

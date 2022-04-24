@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufWriter, Write};
-use std::ops::{AddAssign, Mul};
+use std::ops::{Add, AddAssign, Mul};
 
 /// Struct representation of RGB-Colors
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -38,6 +38,14 @@ impl Color {
             (255.999 * self.g) as u8,
             (255.999 * self.b) as u8,
         ]
+    }
+}
+
+impl Add<Color> for Color {
+    type Output = Color;
+
+    fn add(self, rhs: Color) -> Color {
+        Color::new(self.r + rhs.r, self.g + rhs.g, self.b + rhs.b)
     }
 }
 
@@ -144,24 +152,5 @@ impl Image {
         encoder.set_color(png::ColorType::Rgb);
         let mut writer = encoder.write_header().unwrap();
         writer.write_image_data(&*self.to_u8_buf()).unwrap();
-    }
-
-    pub fn write_image_ppm(&self, output_path: &std::path::Path) {
-        let parent_dir = output_path.parent().unwrap();
-        fs::create_dir_all(parent_dir).unwrap();
-        let mut file = fs::File::create(output_path).unwrap();
-        write!(file, "P3\n{} {}\n255\n", self.width, self.height).unwrap();
-        for j in 0..self.height {
-            for i in 0..self.width {
-                let output_color =
-                    self.pixel_colors[self.get_vertically_flipped_index(i, j)].to_output();
-                writeln!(
-                    file,
-                    "{} {} {}",
-                    output_color[0], output_color[1], output_color[2]
-                )
-                .unwrap();
-            }
-        }
     }
 }

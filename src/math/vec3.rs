@@ -104,6 +104,11 @@ impl Vector3 {
     pub fn mirror(&self, n: &Vector3) -> Vector3 {
         return *n * (2.0 * self.dot(n)) - *self;
     }
+
+    #[inline]
+    pub fn reflect(&self, n: &Vector3) -> Vector3 {
+        *self - *n * (2.0 * n.dot(self))
+    }
 }
 
 /// Add implementation for Vector + Vector
