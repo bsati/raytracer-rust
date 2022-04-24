@@ -97,19 +97,36 @@ impl Image {
         y * self.width + x
     }
 
+    #[inline]
+    fn get_vertically_flipped_index(&self, x: usize, y: usize) -> usize {
+        (self.height - 1 - y) * self.width + x
+    }
+
     /// Sets the Color of the Image pixel at coordinates `x` and `y` to the given `color`.
     pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
-        let idx = self.get_index(y, x);
+        let idx = self.get_index(x, y);
         self.pixel_colors[idx] = color;
     }
 
     #[inline]
     fn to_u8_buf(&self) -> Box<[u8]> {
-        let result: Vec<u8> = self
-            .pixel_colors
-            .iter()
-            .flat_map(|&c| c.to_output())
-            .collect();
+        // let result: Vec<u8> = self
+        //     .pixel_colors
+        //     .iter()
+        //     .flat_map(|&c| c.to_output())
+        //     .collect();
+        let mut result = vec![0; 3 * self.width * self.height];
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let idx = self.get_index(x, y);
+                let output_colors = self.pixel_colors[idx].to_output();
+
+                let flipped_index = self.get_vertically_flipped_index(x, y);
+                for c in 0..3 {
+                    result[3 * flipped_index + c] = output_colors[c];
+                }
+            }
+        }
         result.into_boxed_slice()
     }
 
@@ -136,7 +153,8 @@ impl Image {
         write!(file, "P3\n{} {}\n255\n", self.width, self.height).unwrap();
         for j in 0..self.height {
             for i in 0..self.width {
-                let output_color = self.pixel_colors[self.get_index(i, j)].to_output();
+                let output_color =
+                    self.pixel_colors[self.get_vertically_flipped_index(i, j)].to_output();
                 writeln!(
                     file,
                     "{} {} {}",
