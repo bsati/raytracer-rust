@@ -14,6 +14,7 @@ pub struct Scene {
 pub struct ImageConfig {
     pub width: usize,
     pub height: usize,
+    pub depth: u8,
     pub background: Color,
 }
 

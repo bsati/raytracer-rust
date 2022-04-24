@@ -1,6 +1,7 @@
 image:
   width: 500
   height: 500
+  depth: 5
   background: 
     r: 0.0
     g: 0.0

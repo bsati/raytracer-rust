@@ -50,10 +50,10 @@ pub fn compute_image(scene_path: &path::Path, output_path: &path::Path) {
 
     let mut img = image::Image::new(scene.image.width, scene.image.height);
     let camera = camera::Camera::new(
-        math::Vector3::new(0.0, 0.0, 0.0),
-        math::Vector3::new(0.0, 0.0, -5.0),
-        math::Vector3::new(0.0, 1.0, 0.0),
-        50.0,
+        scene.camera.eye,
+        scene.camera.look_at,
+        scene.camera.up,
+        scene.camera.fovy,
         scene.image.width,
         scene.image.height,
     );
