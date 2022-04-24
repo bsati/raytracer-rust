@@ -3,6 +3,7 @@ use crate::raytracer::camera;
 use crate::raytracer::image;
 use crate::raytracer::image::Color;
 use crate::raytracer::scene;
+use rand::Rng;
 use serde_yaml;
 use std::fs;
 use std::path;
@@ -73,6 +74,7 @@ impl Ray {
 
 pub enum SuperSampling {
     Uniform(u8),
+    Jitter(u8),
 }
 
 fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
@@ -86,12 +88,28 @@ fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, 
     samples
 }
 
+fn jitter_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
+    let mut rng = rand::thread_rng();
+    let step: f64 = 1.0 / resolution as f64;
+    let mut samples = Vec::with_capacity((resolution * resolution) as usize);
+    for i in 1..resolution + 1 {
+        for j in 1..resolution + 1 {
+            samples.push((
+                rng.gen_range(base_x..(base_x + i as f64 * step)),
+                rng.gen_range(base_y..(base_y + j as f64 * step)),
+            ));
+        }
+    }
+    samples
+}
+
 impl SuperSampling {
     fn sample(&self, x: usize, y: usize) -> Vec<(f64, f64)> {
         match self {
             SuperSampling::Uniform(resolution) => {
                 uniform_grid_sampling(*resolution, x as f64, y as f64)
             }
+            SuperSampling::Jitter(resolution) => jitter_sampling(*resolution, x as f64, y as f64),
         }
     }
 }

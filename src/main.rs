@@ -24,7 +24,7 @@ fn main() {
     let scene_path = path::Path::new("./scenes/spheres.yaml");
     let output_path = path::Path::new("./outputs/spheres.png");
     raytracer::compute_image(
-        raytracer::SuperSampling::Uniform(2),
+        raytracer::SuperSampling::Jitter(4),
         5,
         scene_path,
         output_path,
