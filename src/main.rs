@@ -1,17 +1,27 @@
 mod math;
 mod raytracer;
 
-use std::env;
 use std::path;
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[clap(version, about, long_about = None)]
+struct Args {
+    #[clap(short, long)]
+    scene_path: String,
+    #[clap(short, long)]
+    output_path: String,
+    #[clap(short, long, default_value_t = 5)]
+    depth: u8,
+}
+
 fn main() {
-    // let args: Vec<String> = env::args().collect();
-    // if args.len() < 3 {
-    //     panic!("less than 2 arguments supplied. need scene path and output path");
-    // }
-    // let scene_path = path::Path::new(&args[1]);
-    // let output_path = path::Path::new(&args[2]);
+    // let args = Args::parse();
+    // let scene_path = path::Path::new(&args.scene_path);
+    // let output_path = path::Path::new(&args.output_path);
+    // raytracer::compute_image(args.depth, scene_path, output_path);
     let scene_path = path::Path::new("./scenes/spheres.yaml");
     let output_path = path::Path::new("./outputs/spheres.ppm");
-    raytracer::compute_image(scene_path, output_path);
+    raytracer::compute_image(5, scene_path, output_path);
 }

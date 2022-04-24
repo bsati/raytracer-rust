@@ -42,9 +42,10 @@ impl Ray {
 ///
 /// # Arguments
 ///
+/// * `depth` determines the maximum ray bounce / tracing recursion depth
 /// * `scene_path` Path to the scene file determining the needed properties for raytracing
 /// * `output_path` Path of the output image file
-pub fn compute_image(scene_path: &path::Path, output_path: &path::Path) {
+pub fn compute_image(depth: u8, scene_path: &path::Path, output_path: &path::Path) {
     let scene_file = fs::File::open(scene_path).unwrap();
     let scene: scene::Scene = serde_yaml::from_reader(scene_file).unwrap();
 
