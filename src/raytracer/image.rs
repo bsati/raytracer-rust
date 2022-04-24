@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 
+/// Struct representation of RGB-Colors
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Color {
     pub r: f64,
@@ -10,10 +11,18 @@ pub struct Color {
 }
 
 impl Color {
+    /// Creates a new color struct with the given rgb values
+    ///
+    /// # Arguments
+    ///
+    /// * `r` red-channel value
+    /// * `g` green-channel value
+    /// * `b` blue-channel value
     pub fn new(r: f64, g: f64, b: f64) -> Color {
         Color { r: r, g: g, b: b }
     }
 
+    /// Converts the current value to PPM compatible output values contained in an integer array.
     #[inline]
     pub fn to_output(&self) -> [i32; 3] {
         [
@@ -24,6 +33,7 @@ impl Color {
     }
 }
 
+/// Representation of an Image with a certain width and height and it's Pixel colors
 #[derive(Debug)]
 pub struct Image {
     width: usize,
@@ -32,6 +42,13 @@ pub struct Image {
 }
 
 impl Image {
+    /// Creates a new Image with the given width and height and allocates
+    /// the needed `pixel_colors` storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` width of the image (row pixel count)
+    /// * `height` height of the image (column pixel count)
     pub fn new(width: usize, height: usize) -> Image {
         Image {
             width: width,
@@ -40,16 +57,25 @@ impl Image {
         }
     }
 
+    /// Utility function to get the index for the specified `x` and `y` coordinates.
+    /// Since the Image uses a linear Vector for storage and `(x, y)` denoting a grid point
+    /// some calculation is needed to get the corresponding index.
     #[inline]
     fn get_index(&self, x: usize, y: usize) -> usize {
         y * self.width + x
     }
 
+    /// Sets the Color of the Image pixel at coordinates `x` and `y` to the given `color`.
     pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
         let index = self.get_index(x, y);
         self.pixel_colors[index] = color;
     }
 
+    /// Writes the current Image data (Pixel colors) to a PPM file at the given `output_path`.
+    ///
+    /// # Arguments
+    ///
+    /// * `output_path` Path specifying the output file to write to (will be created if it doesn't exist and overriden if it exists)
     pub fn write_image(&self, output_path: &std::path::Path) {
         let mut file = fs::File::create(output_path).unwrap();
         write!(file, "P3\n{} {}\n255\n", self.width, self.height);
