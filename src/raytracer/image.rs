@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 use std::ops::{Add, AddAssign, DivAssign, Mul};
 
 /// Struct representation of RGB-Colors

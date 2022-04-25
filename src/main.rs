@@ -14,13 +14,15 @@ struct Args {
     output_path: String,
     #[clap(short, long, default_value_t = 5)]
     depth: u8,
+    #[clap(long, required = false, default_value = "uniform:2")]
+    ssaa: raytracer::SuperSampling,
 }
 
 fn main() {
     // let args = Args::parse();
     // let scene_path = path::Path::new(&args.scene_path);
     // let output_path = path::Path::new(&args.output_path);
-    // raytracer::compute_image(args.depth, scene_path, output_path);
+    // raytracer::compute_image(args.ssaa, args.depth, scene_path, output_path);
     let scene_path = path::Path::new("./scenes/spheres.yaml");
     let output_path = path::Path::new("./outputs/spheres.png");
     raytracer::compute_image(

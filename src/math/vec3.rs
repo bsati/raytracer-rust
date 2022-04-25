@@ -22,19 +22,6 @@ impl Vector3 {
         Vector3 { x: x, y: y, z: z }
     }
 
-    /// Creates a new vector with every coordinate set to the given `scalar`.
-    ///
-    /// # Arguments
-    ///
-    /// * `scalar` value to set in all coordinates
-    pub fn from_scalar(scalar: f64) -> Vector3 {
-        Vector3 {
-            x: scalar,
-            y: scalar,
-            z: scalar,
-        }
-    }
-
     /// Calculates the dot product of two vectors.
     ///
     /// # Arguments
@@ -81,18 +68,6 @@ impl Vector3 {
             return Vector3::new(self.x / norm, self.y / norm, self.z / norm);
         }
         self.clone()
-    }
-
-    /// Normalizes a vector in place.
-    #[inline]
-    pub fn normalize(&mut self) -> &mut Vector3 {
-        let norm = self.len();
-        if norm != 0.0 {
-            self.x /= norm;
-            self.y /= norm;
-            self.z /= norm;
-        }
-        self
     }
 
     /// Constructs a new vector as a mirrored version of `self` along the normal `n`.
