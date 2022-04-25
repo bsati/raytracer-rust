@@ -81,84 +81,36 @@ impl Mul<f64> for Color {
     }
 }
 
-/// Representation of an Image with a certain width and height and it's Pixel colors
-#[derive(Debug)]
-pub struct Image {
-    width: usize,
-    height: usize,
-    pixel_colors: Vec<Color>,
+#[inline]
+fn to_u8_buf(pixel_colors: Vec<Vec<Color>>) -> Box<[u8]> {
+    let result: Vec<u8> = pixel_colors
+        .iter()
+        .flatten()
+        .flat_map(|&c| c.to_output())
+        .collect();
+    result.into_boxed_slice()
 }
 
-impl Image {
-    /// Creates a new Image with the given width and height and allocates
-    /// the needed `pixel_colors` storage.
-    ///
-    /// # Arguments
-    ///
-    /// * `width` width of the image (row pixel count)
-    /// * `height` height of the image (column pixel count)
-    pub fn new(width: usize, height: usize) -> Image {
-        Image {
-            width: width,
-            height: height,
-            pixel_colors: vec![Color::new(0.0, 0.0, 0.0); width * height],
-        }
-    }
-
-    /// Utility function to get the index for the specified `x` and `y` coordinates.
-    /// Since the Image uses a linear Vector for storage and `(x, y)` denoting a grid point
-    /// some calculation is needed to get the corresponding index.
-    #[inline]
-    fn get_index(&self, x: usize, y: usize) -> usize {
-        y * self.width + x
-    }
-
-    #[inline]
-    fn get_vertically_flipped_index(&self, x: usize, y: usize) -> usize {
-        (self.height - 1 - y) * self.width + x
-    }
-
-    /// Sets the Color of the Image pixel at coordinates `x` and `y` to the given `color`.
-    pub fn set_pixel_color(&mut self, x: usize, y: usize, color: Color) {
-        let idx = self.get_index(x, y);
-        self.pixel_colors[idx] = color;
-    }
-
-    #[inline]
-    fn to_u8_buf(&self) -> Box<[u8]> {
-        // let result: Vec<u8> = self
-        //     .pixel_colors
-        //     .iter()
-        //     .flat_map(|&c| c.to_output())
-        //     .collect();
-        let mut result = vec![0; 3 * self.width * self.height];
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let idx = self.get_index(x, y);
-                let output_colors = self.pixel_colors[idx].to_output();
-
-                let flipped_index = self.get_vertically_flipped_index(x, y);
-                for c in 0..3 {
-                    result[3 * flipped_index + c] = output_colors[c];
-                }
-            }
-        }
-        result.into_boxed_slice()
-    }
-
-    /// Writes the current Image data (Pixel colors) to a png file at the given `output_path`.
-    ///
-    /// # Arguments
-    ///
-    /// * `output_path` Path specifying the output file to write to (will be created if it doesn't exist and overriden if it exists)
-    pub fn write_image(&self, output_path: &std::path::Path) {
-        let parent_dir = output_path.parent().unwrap();
-        fs::create_dir_all(parent_dir).unwrap();
-        let file = fs::File::create(output_path).unwrap();
-        let ref mut w = BufWriter::new(file);
-        let mut encoder = png::Encoder::new(w, self.width as u32, self.height as u32);
-        encoder.set_color(png::ColorType::Rgb);
-        let mut writer = encoder.write_header().unwrap();
-        writer.write_image_data(&*self.to_u8_buf()).unwrap();
-    }
+/// Writes the current Image data (Pixel colors) to a png file at the given `output_path`.
+///
+/// # Arguments
+///
+/// * `pixel_colors` Vector containing the colors in row -> column order (size: width * height)
+/// * `width` width of the image
+/// * `height` height of the image
+/// * `output_path` Path specifying the output file to write to (will be created if it doesn't exist and overriden if it exists)
+pub fn write_image(
+    pixel_colors: Vec<Vec<Color>>,
+    width: usize,
+    height: usize,
+    output_path: &std::path::Path,
+) {
+    let parent_dir = output_path.parent().unwrap();
+    fs::create_dir_all(parent_dir).unwrap();
+    let file = fs::File::create(output_path).unwrap();
+    let ref mut w = BufWriter::new(file);
+    let mut encoder = png::Encoder::new(w, width as u32, height as u32);
+    encoder.set_color(png::ColorType::Rgb);
+    let mut writer = encoder.write_header().unwrap();
+    writer.write_image_data(&*to_u8_buf(pixel_colors)).unwrap();
 }

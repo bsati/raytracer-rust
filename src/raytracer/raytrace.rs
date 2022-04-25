@@ -4,6 +4,7 @@ use crate::raytracer::image;
 use crate::raytracer::image::Color;
 use crate::raytracer::scene;
 use rand::Rng;
+use rayon::prelude::*;
 use serde_yaml;
 use std::fs;
 use std::path;
@@ -132,7 +133,6 @@ pub fn compute_image(
     let scene_file = fs::File::open(scene_path).unwrap();
     let scene_config: scene::SceneConfig = serde_yaml::from_reader(scene_file).unwrap();
 
-    let mut img = image::Image::new(scene_config.image.width, scene_config.image.height);
     let camera = camera::Camera::new(
         scene_config.camera.eye,
         scene_config.camera.look_at,
@@ -141,23 +141,35 @@ pub fn compute_image(
         scene_config.image.width,
         scene_config.image.height,
     );
-    for i in 0..scene_config.image.width {
-        for j in 0..scene_config.image.height {
-            let samples = ssaa.sample(i, j);
-            let mut pixel_color = image::Color::new(0.0, 0.0, 0.0);
-            let count = samples.len();
-            for sample in samples {
-                let ray = camera.spawn_ray(sample.0, sample.1);
-                pixel_color += ray.trace(&scene_config, 0, depth);
-            }
-            pixel_color /= count as f64;
-            // Gamma adjustment
-            pixel_color.r = f64::sqrt(pixel_color.r);
-            pixel_color.g = f64::sqrt(pixel_color.g);
-            pixel_color.b = f64::sqrt(pixel_color.b);
-            pixel_color.clamp();
-            img.set_pixel_color(i, j, pixel_color);
-        }
-    }
-    img.write_image(output_path);
+    let pixel_colors: Vec<Vec<Color>> = (0..scene_config.image.height)
+        .into_par_iter()
+        .rev()
+        .map(|j: usize| {
+            (0..scene_config.image.width)
+                .into_par_iter()
+                .map(|i: usize| {
+                    let samples = ssaa.sample(i, j);
+                    let mut pixel_color = image::Color::new(0.0, 0.0, 0.0);
+                    let count = samples.len();
+                    for sample in samples {
+                        let ray = camera.spawn_ray(sample.0, sample.1);
+                        pixel_color += ray.trace(&scene_config, 0, depth);
+                    }
+                    pixel_color /= count as f64;
+                    // Gamma adjustment
+                    pixel_color.r = f64::sqrt(pixel_color.r);
+                    pixel_color.g = f64::sqrt(pixel_color.g);
+                    pixel_color.b = f64::sqrt(pixel_color.b);
+                    pixel_color.clamp();
+                    pixel_color
+                })
+                .collect()
+        })
+        .collect();
+    image::write_image(
+        pixel_colors,
+        scene_config.image.width,
+        scene_config.image.height,
+        output_path,
+    );
 }
