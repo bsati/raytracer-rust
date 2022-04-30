@@ -90,7 +90,7 @@ pub fn compute_image(
     output_path: &path::Path,
 ) {
     let scene_file = fs::File::open(scene_path).unwrap();
-    let scene_config: scene::SceneConfig = serde_yaml::from_reader(scene_file).unwrap();
+    let mut scene_config: scene::SceneConfig = serde_yaml::from_reader(scene_file).unwrap();
 
     let camera = camera::Camera::new(
         scene_config.camera.eye,
@@ -100,6 +100,7 @@ pub fn compute_image(
         scene_config.image.width,
         scene_config.image.height,
     );
+    scene_config.scene.precompute();
     let pixel_colors: Vec<Vec<Color>> = (0..scene_config.image.height)
         .into_par_iter()
         .rev()
@@ -110,10 +111,14 @@ pub fn compute_image(
                     let samples = ssaa.sample(i, j);
                     let mut pixel_color = image::Color::new(0.0, 0.0, 0.0);
                     let count = samples.len();
-                    for sample in samples {
-                        let ray = camera.spawn_ray(sample.0, sample.1);
-                        pixel_color += ray.trace(&scene_config, 0, depth);
-                    }
+                    let samples_color = samples
+                        .into_par_iter()
+                        .map(|sample| {
+                            let ray = camera.spawn_ray(sample.0, sample.1);
+                            ray.trace(&scene_config, 0, depth)
+                        })
+                        .reduce(|| Color::new(0.0, 0.0, 0.0), |a, b| a + b);
+                    pixel_color += samples_color;
                     pixel_color /= count as f64;
                     // Gamma adjustment
                     pixel_color.r = f64::sqrt(pixel_color.r);

@@ -25,30 +25,25 @@ scene:
     g: 0.2
     b: 0.2
   lights:
-    - position:
-        x: 0
-        y: 50
-        z: 0
-      color: 
-        r: 0.35
-        g: 0.35
-        b: 0.35
-    - position: 
-        x: 50
-        y: 50
-        z: 50
-      color: 
-        r: 0.35
-        g: 0.35
-        b: 0.35
-    - position: 
-        x: -50
-        y: 50
-        z: 50
-      color: 
-        r: 0.35
-        g: 0.35
-        b: 0.35
+    - color: 
+        r: 0.85
+        g: 0.85
+        b: 0.85
+      light_info:
+        type: Area
+        corner: 
+          x: 50
+          y: 50
+          z: 50
+        u:
+          x: 0
+          y: 20
+          z: 0
+        v:
+          x: 0
+          y: 0
+          z: 20
+        grid_resolution: 8
   objects:
     - type: Sphere
       center: 

@@ -1,4 +1,5 @@
 use crate::math::Vector3;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 
 use super::{
@@ -32,7 +33,7 @@ pub struct CameraConfig {
 #[derive(Deserialize)]
 pub struct Scene {
     pub ambient_light: Color,
-    pub lights: Vec<Light>,
+    lights: Vec<Light>,
     pub objects: Vec<Object>,
 }
 
@@ -103,32 +104,106 @@ impl Scene {
         let mut c = material.ambient_color * self.ambient_light;
 
         for l in &self.lights {
-            let lp_vec = l.position - *point;
-            let lp_vec_normalized = lp_vec.normalized();
-            if self.should_color(point, &lp_vec, &lp_vec_normalized) {
-                let r = lp_vec_normalized.mirror(normal);
-                let dot_l = normal.dot(&lp_vec_normalized);
-                if dot_l >= 0.0 {
-                    c += l.color * (material.diffuse_color * dot_l);
+            let mut l_color = l
+                .samples
+                .par_iter()
+                .map(|l_vec| {
+                    let mut light_color = Color::new(0.0, 0.0, 0.0);
+                    let lp_vec = *l_vec - *point;
+                    let lp_vec_normalized = lp_vec.normalized();
+                    if self.should_color(point, &lp_vec, &lp_vec_normalized) {
+                        let r = lp_vec_normalized.mirror(normal);
+                        let dot_l = normal.dot(&lp_vec_normalized);
+                        if dot_l >= 0.0 {
+                            light_color += l.color * (material.diffuse_color * dot_l);
 
-                    let dot_r = view.dot(&r);
-                    if dot_r >= 0.0 {
-                        let shininess = dot_r.powf(material.shininess);
-                        c += material.specular_color * l.color * shininess;
+                            let dot_r = view.dot(&r);
+                            if dot_r >= 0.0 {
+                                let shininess = dot_r.powf(material.shininess);
+                                light_color += material.specular_color * l.color * shininess;
+                            }
+                        }
                     }
-                }
-            }
+
+                    light_color
+                })
+                .reduce(|| Color::new(0.0, 0.0, 0.0), |a, b| a + b);
+            l_color /= l.samples.len() as f64;
+            c += l_color;
         }
 
         c
     }
+
+    pub fn precompute(&mut self) {
+        for l in &mut self.lights {
+            l.compute_samples();
+        }
+    }
 }
 
 #[derive(Deserialize)]
-pub struct Light {
-    pub position: Vector3,
-    pub color: Color,
+struct Light {
+    #[serde(skip_deserializing)]
+    samples: Vec<Vector3>,
+    color: Color,
+    light_info: LightInfo,
 }
+
+impl Light {
+    fn compute_samples(&mut self) {
+        self.samples = self.light_info.sample();
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum LightInfo {
+    Point(PointLight),
+    Area(AreaLight),
+    Sphere(SphereLight),
+}
+
+impl LightInfo {
+    fn sample(&self) -> Vec<Vector3> {
+        match self {
+            LightInfo::Point(pl) => vec![pl.position],
+            LightInfo::Area(area_light) => {
+                let resolution = area_light.grid_resolution;
+                let mut result = Vec::with_capacity(resolution * resolution);
+                for i in 0..resolution {
+                    for j in 0..resolution {
+                        result.push(
+                            area_light.corner
+                                + (area_light.u / i as f64)
+                                + (area_light.v / j as f64),
+                        );
+                    }
+                }
+                result
+            }
+            LightInfo::Sphere(sphere_light) => {
+                vec![]
+            }
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct PointLight {
+    position: Vector3,
+}
+
+#[derive(Deserialize)]
+struct AreaLight {
+    corner: Vector3,
+    u: Vector3,
+    v: Vector3,
+    grid_resolution: usize,
+}
+
+#[derive(Deserialize)]
+struct SphereLight {}
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]

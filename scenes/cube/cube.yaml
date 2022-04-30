@@ -25,14 +25,25 @@ scene:
     g: 0.2
     b: 0.2
   lights:
-    - position: 
-        x: -5
-        y: 25
-        z: 15
-      color: 
+    - color: 
         r: 0.85
         g: 0.85
         b: 0.85
+      light_info:
+        type: Area
+        corner: 
+          x: -5
+          y: 25
+          z: 15
+        u:
+          x: 0
+          y: 0
+          z: 4
+        v:
+          x: 0
+          y: 4
+          z: 0
+        grid_resolution: 12
   objects:
     - type: Mesh
       path: './scenes/cube/cube.obj'
