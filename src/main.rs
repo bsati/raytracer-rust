@@ -23,8 +23,8 @@ fn main() {
     // let scene_path = path::Path::new(&args.scene_path);
     // let output_path = path::Path::new(&args.output_path);
     // raytracer::compute_image(args.ssaa, args.depth, scene_path, output_path);
-    let scene_path = path::Path::new("./scenes/spheres.yaml");
-    let output_path = path::Path::new("./outputs/spheres.png");
+    let scene_path = path::Path::new("./scenes/cube/cube.yaml");
+    let output_path = path::Path::new("./scenes/cube/cube.png");
     raytracer::compute_image(
         raytracer::SuperSampling::Jitter(4),
         5,

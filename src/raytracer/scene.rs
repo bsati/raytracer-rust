@@ -1,23 +1,24 @@
 use crate::math::Vector3;
 use crate::raytracer::image::Color;
+use crate::raytracer::mesh::{load_obj, Mesh};
 use crate::raytracer::raytrace::Ray;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct SceneConfig {
     pub image: ImageConfig,
     pub camera: CameraConfig,
     pub scene: Scene,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ImageConfig {
     pub width: usize,
     pub height: usize,
     pub background: Color,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct CameraConfig {
     pub eye: Vector3,
     pub look_at: Vector3,
@@ -25,7 +26,7 @@ pub struct CameraConfig {
     pub fovy: f64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Scene {
     pub ambient_light: Color,
     pub lights: Vec<Light>,
@@ -120,40 +121,65 @@ impl Scene {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Light {
     pub position: Vector3,
     pub color: Color,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
+    Mesh(Mesh),
 }
 
-#[derive(Serialize, Deserialize)]
+impl<'de> Deserialize<'de> for Mesh {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
+        let path = std::path::Path::new(val.get("path").unwrap().as_str().unwrap());
+        let meshes = load_obj(path);
+        Ok(meshes[0].to_owned())
+    }
+}
+
+#[derive(Deserialize)]
 pub struct Sphere {
     pub center: Vector3,
     pub radius: f64,
     pub material: Material,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Plane {
     pub center: Vector3,
     pub normal: Vector3,
     pub material: Material,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Deserialize, Clone, Copy, Debug)]
 pub struct Material {
     pub ambient_color: Color,
     pub diffuse_color: Color,
     pub specular_color: Color,
     pub shininess: f64,
     pub mirror: f64,
+}
+
+impl Material {
+    pub fn default() -> Material {
+        Material {
+            ambient_color: Color::default(),
+            diffuse_color: Color::default(),
+            specular_color: Color::default(),
+            shininess: -1.0,
+            mirror: 0.0,
+        }
+    }
 }
 
 /// Information about a ray-object intersection.
@@ -169,10 +195,10 @@ pub struct IntersectionInfo {
 impl IntersectionInfo {
     fn new(point: Vector3, normal: Vector3, material: Material, t: f64) -> IntersectionInfo {
         IntersectionInfo {
-            point: point,
-            normal: normal,
-            material: material,
-            t: t,
+            point,
+            normal,
+            material,
+            t,
         }
     }
 }
@@ -188,6 +214,7 @@ impl Intersectable for Object {
         match self {
             Object::Sphere(sphere) => sphere.intersect(ray),
             Object::Plane(plane) => plane.intersect(ray),
+            Object::Mesh(mesh) => mesh.intersect(ray),
         }
     }
 }
@@ -255,5 +282,79 @@ impl Intersectable for Plane {
             self.material,
             intersection_t,
         ))
+    }
+}
+
+impl Intersectable for Mesh {
+    /// Intersection testing of a mesh happens in two steps:
+    /// - test the AABB of the mesh (TODO)
+    /// - test each triangle of the mesh and find the closest intersection (if any exist)
+    ///
+    /// Triangle intersection is implemented via barycentric coordinates.
+    /// For a triangle constructed by the points `a`, `b`, `c` and a ray with origin `o` and direction `d`
+    /// the equation `o + td = alpha * a + beta * b + (1 - alpha - beta) * c` has to be solved.
+    /// This is done by using Cramers-Rule after rearranging the equation to:
+    /// `[ d | (b-a) | (c-a) ] = (-t, alpha, beta)^T`
+    /// To compute the determinants of the needed matrices the following code uses each column as a seperate Vector3.
+    ///
+    /// For three vectors `v1`, `v2` and `v3` the determinant is then
+    /// calculated by the following pattern:
+    /// det = (v1.x * v2.y * v3.z + v2.x * v3.y * v1.z + v3.x * v1.y * v2.z) - (v3.x * v2.y * v1.z + v2.x * b1.y * b3.z + v1.x * v3.y * v2.z)
+    /// following from:
+    /// | a b c |
+    /// | d e f |
+    /// | g h i |
+    /// det = (aei + bfg + cdh) - (ceg + bdi + afh)
+    fn intersect(&self, ray: &Ray) -> Option<IntersectionInfo> {
+        let mut result: Option<IntersectionInfo> = None;
+        for triangle in &self.triangles {
+            let pos_idx = triangle.vertex_idx;
+            let a = self.vertex_positions[pos_idx[0]];
+            let b = self.vertex_positions[pos_idx[1]];
+            let c = self.vertex_positions[pos_idx[2]];
+            let ab = b - a;
+            let ac = c - a;
+
+            let res = ray.origin - a;
+            let det_m = (ray.direction.x * ab.y * ac.z
+                + ab.x * ac.y * ray.direction.z
+                + ac.x * ray.direction.y * ab.z)
+                - (ac.x * ab.y * ray.direction.z
+                    + ab.x * ray.direction.y * ac.z
+                    + ray.direction.x * ac.y * ab.z);
+            let det_m_t = (res.x * ab.y * ac.z + ab.x * ac.y * res.z + ac.x * res.y * ab.z)
+                - (ac.x * ab.y * res.z + ab.x * res.y * ac.z + res.x * ac.y * ab.z);
+            let det_m_a = (ray.direction.x * res.y * ac.z
+                + res.x * ac.y * ray.direction.z
+                + ac.x * ray.direction.y * res.z)
+                - (ac.x * res.y * ray.direction.z
+                    + res.x * ray.direction.y * ac.z
+                    + ray.direction.x * ac.y * res.z);
+            let det_m_b = (ray.direction.x * ab.y * res.z
+                + ab.x * res.y * ray.direction.z
+                + res.x * ray.direction.y * ab.z)
+                - (res.x * ab.y * ray.direction.z
+                    + ab.x * ray.direction.y * res.z
+                    + ray.direction.x * res.y * ab.z);
+
+            let a = det_m_a / det_m;
+            let b = det_m_b / det_m;
+            let t = -(det_m_t / det_m);
+
+            if a < 0.0 || b < 0.0 || a + b > 1.0 || t < 0.0 {
+                continue;
+            }
+            let normal = ab.cross(&ac).normalized();
+            if result.is_none() || result.unwrap().t > t {
+                result = Some(IntersectionInfo::new(
+                    ray.at_timestep(t),
+                    normal,
+                    self.materials[triangle.material_idx],
+                    t,
+                ));
+            }
+        }
+
+        result
     }
 }

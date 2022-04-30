@@ -3,6 +3,8 @@ use std::fs;
 use std::io::BufWriter;
 use std::ops::{Add, AddAssign, DivAssign, Mul};
 
+use crate::math::Vector3;
+
 /// Struct representation of RGB-Colors
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Color {
@@ -20,7 +22,16 @@ impl Color {
     /// * `g` green-channel value
     /// * `b` blue-channel value
     pub fn new(r: f64, g: f64, b: f64) -> Color {
-        Color { r: r, g: g, b: b }
+        Color { r, g, b }
+    }
+
+    /// Creates a new color with all values set to `0`.
+    pub fn default() -> Color {
+        Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+        }
     }
 
     /// Clamps the color to a maximum of `1.0` to avoid over-saturation
@@ -38,6 +49,16 @@ impl Color {
             (255.999 * self.g) as u8,
             (255.999 * self.b) as u8,
         ]
+    }
+}
+
+impl From<Vector3> for Color {
+    fn from(vec: Vector3) -> Self {
+        Color {
+            r: vec.x,
+            g: vec.y,
+            b: vec.z,
+        }
     }
 }
 
