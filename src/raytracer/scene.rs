@@ -1,8 +1,11 @@
 use crate::math::Vector3;
-use crate::raytracer::image::Color;
-use crate::raytracer::mesh::{load_obj, Mesh};
-use crate::raytracer::raytrace::Ray;
 use serde::{Deserialize, Deserializer};
+
+use super::{
+    image::Color,
+    mesh::{load_obj, Mesh},
+    raytrace::Ray,
+};
 
 #[derive(Deserialize)]
 pub struct SceneConfig {
@@ -285,6 +288,28 @@ impl Intersectable for Plane {
     }
 }
 
+/// Calculates the determinant of a matrix represented by three column vectors.
+///
+/// Following the formula of:
+/// | a b c |
+/// | d e f |
+/// | g h i |
+/// det = (aei + bfg + cdh) - (ceg + bdi + afh)
+///
+/// which leads to
+/// det = (v1.x * v2.y * v3.z + v2.x * v3.y * v1.z + v3.x * v1.y * v2.z) - (v3.x * v2.y * v1.z + v2.x * v1.y * v3.z + v1.x * v3.y * v2.z)
+///
+/// # Arguments
+///
+/// * `v1` Vector representing the left column
+/// * `v2` Vector representing the middle column
+/// * `v3` Vector representing the right column
+#[inline]
+fn calculate_determinant(v1: &Vector3, v2: &Vector3, v3: &Vector3) -> f64 {
+    (v1.x * v2.y * v3.z + v2.x * v3.y * v1.z + v3.x * v1.y * v2.z)
+        - (v3.x * v2.y * v1.z + v2.x * v1.y * v3.z + v1.x * v3.y * v2.z)
+}
+
 impl Intersectable for Mesh {
     /// Intersection testing of a mesh happens in two steps:
     /// - test the AABB of the mesh (TODO)
@@ -295,16 +320,7 @@ impl Intersectable for Mesh {
     /// the equation `o + td = alpha * a + beta * b + (1 - alpha - beta) * c` has to be solved.
     /// This is done by using Cramers-Rule after rearranging the equation to:
     /// `[ d | (b-a) | (c-a) ] = (-t, alpha, beta)^T`
-    /// To compute the determinants of the needed matrices the following code uses each column as a seperate Vector3.
-    ///
-    /// For three vectors `v1`, `v2` and `v3` the determinant is then
-    /// calculated by the following pattern:
-    /// det = (v1.x * v2.y * v3.z + v2.x * v3.y * v1.z + v3.x * v1.y * v2.z) - (v3.x * v2.y * v1.z + v2.x * b1.y * b3.z + v1.x * v3.y * v2.z)
-    /// following from:
-    /// | a b c |
-    /// | d e f |
-    /// | g h i |
-    /// det = (aei + bfg + cdh) - (ceg + bdi + afh)
+    /// The Matrix on the left hand side is represented as three column vectors.
     fn intersect(&self, ray: &Ray) -> Option<IntersectionInfo> {
         let mut result: Option<IntersectionInfo> = None;
         for triangle in &self.triangles {
@@ -316,26 +332,10 @@ impl Intersectable for Mesh {
             let ac = c - a;
 
             let res = ray.origin - a;
-            let det_m = (ray.direction.x * ab.y * ac.z
-                + ab.x * ac.y * ray.direction.z
-                + ac.x * ray.direction.y * ab.z)
-                - (ac.x * ab.y * ray.direction.z
-                    + ab.x * ray.direction.y * ac.z
-                    + ray.direction.x * ac.y * ab.z);
-            let det_m_t = (res.x * ab.y * ac.z + ab.x * ac.y * res.z + ac.x * res.y * ab.z)
-                - (ac.x * ab.y * res.z + ab.x * res.y * ac.z + res.x * ac.y * ab.z);
-            let det_m_a = (ray.direction.x * res.y * ac.z
-                + res.x * ac.y * ray.direction.z
-                + ac.x * ray.direction.y * res.z)
-                - (ac.x * res.y * ray.direction.z
-                    + res.x * ray.direction.y * ac.z
-                    + ray.direction.x * ac.y * res.z);
-            let det_m_b = (ray.direction.x * ab.y * res.z
-                + ab.x * res.y * ray.direction.z
-                + res.x * ray.direction.y * ab.z)
-                - (res.x * ab.y * ray.direction.z
-                    + ab.x * ray.direction.y * res.z
-                    + ray.direction.x * res.y * ab.z);
+            let det_m = calculate_determinant(&ray.direction, &ab, &ac);
+            let det_m_t = calculate_determinant(&res, &ab, &ac);
+            let det_m_a = calculate_determinant(&ray.direction, &res, &ac);
+            let det_m_b = calculate_determinant(&ray.direction, &ab, &res);
 
             let a = det_m_a / det_m;
             let b = det_m_b / det_m;

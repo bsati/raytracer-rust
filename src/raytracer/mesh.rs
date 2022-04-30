@@ -3,15 +3,16 @@ use crate::raytracer::image::Color;
 use crate::raytracer::scene::Material;
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
-    fmt::Debug,
-    fs::File,
-    io::BufRead,
-    io::BufReader,
-    iter::Peekable,
-    str::{FromStr, SplitWhitespace},
+    collections::HashMap, fmt::Debug, fs::File, io::BufRead, io::BufReader, iter::Peekable,
+    str::FromStr,
 };
 
+/// Loads an .obj file and returns a Vec containing all included meshes and their information
+/// needed for raytracing.
+///
+/// # Arguments
+///
+/// * `file_path` Path to the .obj file. If a material library is used, the parent will be used to search for the .mtl file
 pub fn load_obj(file_path: &std::path::Path) -> Vec<Mesh> {
     let obj_file = File::open(file_path).unwrap();
     let reader = BufReader::new(obj_file);
@@ -80,15 +81,35 @@ pub fn load_obj(file_path: &std::path::Path) -> Vec<Mesh> {
     result
 }
 
+/// Enum representing the different formats of face-descriptions
+/// in .obj files
 enum FaceFormat {
+    /// Face represented by only vertex positions
+    /// e.g. f 1 2 3
     VPos,
+    /// Face represented by vertex positions and uv coordinates
+    /// e.g. f 1/1 2/2 3/3
     VPosUv,
+    /// Face represented by vertex positions and normals
+    /// e.g. f 1//1 2//2 3//3
     VPosN,
+    /// Face represented by vertex positions, uv coordinates and normals
+    /// e.g. f 1/1/1 2/2/2 3/3/3
     VPosUvN,
 }
 
 impl FaceFormat {
-    fn determine_format(split: &mut Peekable<SplitWhitespace>) -> FaceFormat {
+    /// Determines the face format by peeking at the first element and checking for following rules
+    ///
+    /// - no slash in the element -> only positions
+    /// - double slash in the first element -> positions + normals
+    /// - slash in the first element, first occurence from left = first occurence from right (no second slash) -> positions + uv coordinates
+    /// - else positions + uv coordinates + normals
+    ///
+    /// # Arguments
+    ///
+    /// * `split` Peekable iterator over the split of arguments
+    fn determine_format<'a, I: Iterator<Item = &'a str>>(split: &mut Peekable<I>) -> FaceFormat {
         let first = split.peek().unwrap();
         if first.contains("//") {
             return FaceFormat::VPosN;
@@ -105,9 +126,16 @@ impl FaceFormat {
         FaceFormat::VPos
     }
 
-    fn get_triangle(
+    /// Creates a Triangle struct by parsing the arguments.
+    ///
+    /// # Arguments
+    ///
+    /// * `split` Iterator over the string arguments to be parsed
+    /// * `idx_helper` Index helper to reduce global file indices to local mesh indices
+    /// * `mat_idx` Index of the currently "active" material to use for the triangle
+    fn get_triangle<'a, I: Iterator<Item = &'a str>>(
         &self,
-        split: &mut Peekable<SplitWhitespace>,
+        split: &mut I,
         idx_helper: &IndexHelper,
         mat_idx: usize,
     ) -> Triangle {
@@ -119,7 +147,7 @@ impl FaceFormat {
                 Triangle::new([i1, i2, i3], mat_idx)
             }
             FaceFormat::VPosUv => {
-                let (mut v_idx, mut uv_idx) = get_tuple_index(split);
+                let (mut v_idx, mut uv_idx) = get_tuple_index(split, "/");
                 for i in 0..3 {
                     v_idx[i] = idx_helper.get_vertex_index(v_idx[i]);
                     uv_idx[i] = idx_helper.get_uv_index(uv_idx[i]);
@@ -130,7 +158,7 @@ impl FaceFormat {
                 t
             }
             FaceFormat::VPosN => {
-                let (v_idx, n_idx) = get_tuple_index(split);
+                let (v_idx, n_idx) = get_tuple_index(split, "//");
                 let mut t = Triangle::new(v_idx, mat_idx);
                 t.normal_idx = Some(n_idx);
 
@@ -157,12 +185,21 @@ impl FaceFormat {
     }
 }
 
-fn get_tuple_index(split: &mut Peekable<SplitWhitespace>) -> ([usize; 3], [usize; 3]) {
+/// Helper function to get a tuple index of a FaceFormat
+///
+/// # Arguments
+///
+/// * `split` Iterator over the arguments to parse
+/// * `split_pat` Pattern to to use for splitting indices
+fn get_tuple_index<'a, I: Iterator<Item = &'a str>>(
+    split: &mut I,
+    split_pat: &str,
+) -> ([usize; 3], [usize; 3]) {
     let mut idx1_arr: [usize; 3] = [0, 0, 0];
     let mut idx2_arr: [usize; 3] = [0, 0, 0];
     for (i, value) in split.enumerate() {
         let parse_string = value.to_string();
-        let split_idx = parse_string.to_string().find("/").unwrap();
+        let split_idx = parse_string.to_string().find(split_pat).unwrap();
         let idx1 = parse_string
             .get(..split_idx)
             .unwrap()
@@ -179,6 +216,12 @@ fn get_tuple_index(split: &mut Peekable<SplitWhitespace>) -> ([usize; 3], [usize
     (idx1_arr, idx2_arr)
 }
 
+/// Loading function for a material library which adds all loaded materials by name to the given HashMap.
+///
+/// # Arguments
+///
+/// * `file_path` path of the material library (.mtl)
+/// * `material_map` mutable map to store the materials in
 fn load_material_lib(file_path: &std::path::Path, material_map: &mut HashMap<String, Material>) {
     let mtl_file = File::open(file_path).unwrap();
     let reader = BufReader::new(mtl_file);
@@ -227,22 +270,26 @@ fn load_material_lib(file_path: &std::path::Path, material_map: &mut HashMap<Str
     }
 }
 
+/// Utility function to parse a Vector3 from the given Iterator
 #[inline]
-fn parse_vec(split: &mut dyn Iterator<Item = &str>) -> Vector3 {
+fn parse_vec<'a, I: Iterator<Item = &'a str>>(split: &mut I) -> Vector3 {
     let x = parse_next(split);
     let y = parse_next(split);
     let z = parse_next(split);
     Vector3::new(x, y, z)
 }
 
+/// Utility function to parse the next value of the iterator to a given type
 #[inline]
-fn parse_next<T: FromStr>(split: &mut dyn Iterator<Item = &str>) -> T
+fn parse_next<'a, T: FromStr, I: Iterator<Item = &'a str>>(split: &mut I) -> T
 where
     <T as FromStr>::Err: Debug,
 {
     split.next().unwrap().parse::<T>().unwrap()
 }
 
+/// Struct containing global counter information to use for
+/// converting global finde indices to local mesh indices.
 struct IndexHelper {
     vertex_count: usize,
     normals_count: usize,
@@ -250,6 +297,7 @@ struct IndexHelper {
 }
 
 impl IndexHelper {
+    /// Creates a new IndexHelper with all counts set to 0
     fn new() -> IndexHelper {
         IndexHelper {
             vertex_count: 0,
@@ -258,26 +306,46 @@ impl IndexHelper {
         }
     }
 
+    /// Increases internal counters by index amounts used in the object
+    ///
+    /// # Arguments
+    ///
+    /// * `obj` Mesh with filled vertex positions, uvs and normals
     fn add_object(&mut self, obj: &Mesh) {
         self.vertex_count += obj.vertex_positions.len();
         self.uv_count += obj.uvs.len();
         self.normals_count += obj.normals.len();
     }
 
+    /// Returns the local index of a vertex
+    ///
+    /// # Arguments
+    ///
+    /// * `file_idx` Global file index of the vertex
     fn get_vertex_index(&self, file_idx: usize) -> usize {
         file_idx - self.vertex_count - 1
     }
 
+    /// Returns the local index of a normal vector
+    ///
+    /// # Arguments
+    ///
+    /// * `file_idx` Global file index of the normal vector
     fn get_normals_index(&self, file_idx: usize) -> usize {
         file_idx - self.normals_count - 1
     }
 
+    /// Returns the local index of a uv coordinates tuple
+    ///
+    /// # Arguments
+    ///
+    /// * `file_idx` Global file index of the tuple
     fn get_uv_index(&self, file_idx: usize) -> usize {
         file_idx - self.uv_count - 1
     }
 }
 
-/// Mesh describes a loaded mesh from withing the .obj file.
+/// Mesh represents a loaded mesh from within an .obj file.
 /// The only supported face type is a triangle. Faces with more than three vertices will result in a panic.
 #[derive(Clone, Debug)]
 pub struct Mesh {
@@ -289,6 +357,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    /// Creates a new Mesh
     fn new() -> Mesh {
         Mesh {
             triangles: Vec::new(),
@@ -300,6 +369,8 @@ impl Mesh {
     }
 }
 
+/// Triangle acts as an index struct representing a single triangle of a mesh.
+/// The contained data is only used to index the mesh's lists.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Triangle {
     pub vertex_idx: [usize; 3],
@@ -309,6 +380,12 @@ pub struct Triangle {
 }
 
 impl Triangle {
+    /// Creates a new Triangle with given vertex indices and material index
+    ///
+    /// # Arguments
+    ///
+    /// * `vertex_idx` Array containing the three vertex indices in the vertex position list of the mesh
+    /// * `material_idx` Index of the material in the mesh's material list
     fn new(vertex_idx: [usize; 3], material_idx: usize) -> Triangle {
         Triangle {
             vertex_idx,
