@@ -221,3 +221,82 @@ impl ops::Neg for Vector3 {
         Vector3::new(-self[0], -self[1], -self[2])
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::Vector3;
+
+    #[test]
+    fn test_dot() {
+        let v1 = Vector3::new(0.0, 0.0, 0.0);
+        let v2 = Vector3::new(1.0, 1.0, 1.0);
+        let v3 = Vector3::new(2.0, 3.0, 4.0);
+
+        let dot_v1_v2 = v1.dot(&v2);
+        let dot_v1_v2_op = v1 * v2;
+        let dot_v2_v3 = v2.dot(&v3);
+
+        assert_eq!(dot_v1_v2, 0.0, "wrong dot product");
+        assert_eq!(dot_v1_v2_op, 0.0, "operator not applying dot product");
+        assert_eq!(dot_v2_v3, 9.0, "wrong dot product");
+    }
+
+    #[test]
+    fn test_cross() {
+        let v1 = Vector3::new(1.0, 0.0, 0.0);
+        let v2 = Vector3::new(0.0, 1.0, 0.0);
+        let v3 = Vector3::new(1.0, 0.0, 0.0);
+
+        let cross_v1_v2 = v1.cross(&v2);
+        let cross_v1_v3 = v1.cross(&v3);
+
+        assert_eq!(
+            cross_v1_v2,
+            Vector3::new(0.0, 0.0, 1.0),
+            "wrong cross product"
+        );
+        assert_eq!(
+            cross_v1_v3,
+            Vector3::new(0.0, 0.0, 0.0),
+            "wrong cross product"
+        );
+    }
+
+    #[test]
+    fn test_normalized_length() {
+        let v1 = Vector3::new(1.0, 2.0, 2.0);
+        let v2 = Vector3::new(0.0, 0.0, 0.0);
+
+        let v1_normalized = v1.normalized();
+        let v2_normalized = v2.normalized();
+
+        assert_eq!(
+            v1_normalized,
+            Vector3::new(1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0),
+            "wrong normalization of non-normalized vector"
+        );
+
+        assert_eq!(
+            v2_normalized, v2,
+            "wrong normalization of zero length vector"
+        );
+    }
+
+    #[test]
+    fn test_operators() {
+        let v1 = Vector3::new(1.0, 1.0, 1.0);
+        let v2 = Vector3::new(0.5, 0.5, 0.5);
+
+        let sub = v1 - v2;
+        let add = v1 + v2;
+        let scale = v1 * 2.0;
+        let scale_s = v1 / 2.0;
+        let neg = -v1;
+
+        assert_eq!(sub, Vector3::new(0.5, 0.5, 0.5), "wrong sub");
+        assert_eq!(add, Vector3::new(1.5, 1.5, 1.5), "wrong add");
+        assert_eq!(scale, Vector3::new(2.0, 2.0, 2.0), "wrong scale");
+        assert_eq!(scale_s, v2, "wrong scale divide");
+        assert_eq!(neg, Vector3::new(-1.0, -1.0, -1.0), "wrong negation");
+    }
+}

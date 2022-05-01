@@ -201,26 +201,30 @@ mod tests {
     #[test]
     fn test_ssaa_uniform_from_str() {
         let valid_uniform = super::SuperSampling::from_str("uniform:2");
+        let invalid_uniform = super::SuperSampling::from_str("uniform");
+        let invalid_uniform_arg = super::SuperSampling::from_str("uniform:invalid");
+
         assert!(
             valid_uniform.is_ok(),
             "expected from_str to return ok got {:?}",
             valid_uniform.err().unwrap()
         );
         let valid_samples_len = valid_uniform.unwrap().sample(0, 0).len();
+
         assert_eq!(
             valid_samples_len,
             4,
             "expected resolution 2 got {}",
             f64::sqrt(valid_samples_len as f64)
         );
-        let invalid_uniform = super::SuperSampling::from_str("uniform");
+
         assert!(
             invalid_uniform.is_err()
                 && invalid_uniform.err().unwrap().error
                     == "no arguments supplied, need resolution for uniform",
             "expected no args error from invalid uniform"
         );
-        let invalid_uniform_arg = super::SuperSampling::from_str("uniform:invalid");
+
         assert!(
             invalid_uniform_arg.is_err()
                 && invalid_uniform_arg.err().unwrap().error == "resolution has to be an integer",
@@ -231,26 +235,30 @@ mod tests {
     #[test]
     fn test_ssaa_jitter_from_str() {
         let valid_jitter = super::SuperSampling::from_str("jitter:2");
+        let invalid_jitter = super::SuperSampling::from_str("jitter");
+        let invalid_uniform_arg = super::SuperSampling::from_str("jitter:invalid");
+
         assert!(
             valid_jitter.is_ok(),
             "expected from_str to return ok got {:?}",
             valid_jitter.err().unwrap()
         );
         let valid_samples_len = valid_jitter.unwrap().sample(0, 0).len();
+
         assert_eq!(
             valid_samples_len,
             4,
             "expected resolution 2 got {}",
             f64::sqrt(valid_samples_len as f64)
         );
-        let invalid_jitter = super::SuperSampling::from_str("jitter");
+
         assert!(
             invalid_jitter.is_err()
                 && invalid_jitter.err().unwrap().error
                     == "no arguments supplied, need resolution for jitter",
             "expected no args error from invalid jitter"
         );
-        let invalid_uniform_arg = super::SuperSampling::from_str("jitter:invalid");
+
         assert!(
             invalid_uniform_arg.is_err()
                 && invalid_uniform_arg.err().unwrap().error == "resolution has to be an integer",
@@ -261,6 +269,7 @@ mod tests {
     #[test]
     fn test_ssaa_invalid_method_from_str() {
         let invalid_method = super::SuperSampling::from_str("invalid");
+
         assert!(
             invalid_method.is_err() && invalid_method.err().unwrap().error == "unknown method",
             "expected unknown method error"

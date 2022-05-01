@@ -45,10 +45,10 @@ impl Camera {
             look_at - horizontal * (0.5 * width as f64) - vertical * (0.5 * height as f64);
 
         Camera {
-            eye: eye,
-            horizontal: horizontal,
-            vertical: vertical,
-            lower_left: lower_left,
+            eye,
+            horizontal,
+            vertical,
+            lower_left,
         }
     }
 
