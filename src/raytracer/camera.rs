@@ -34,9 +34,10 @@ impl Camera {
         let view_vec = look_at - eye;
         let distance = view_vec.len();
         let view = view_vec / distance;
+        let aspect = width as f64 / height as f64;
 
-        let image_height = 2.0 * distance * (0.5 * fovy / 180.0 * std::f64::consts::PI).tan();
-        let image_width = width as f64 / height as f64 * image_height;
+        let image_height = 2.0 * distance * (0.5 * fovy.to_radians()).tan();
+        let image_width = image_height * aspect;
 
         let horizontal = view.cross(&up).normalized() * image_width / width as f64;
         let vertical = horizontal.cross(&view).normalized() * image_height / height as f64;
