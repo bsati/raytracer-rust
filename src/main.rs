@@ -19,16 +19,8 @@ struct Args {
 }
 
 fn main() {
-    // let args = Args::parse();
-    // let scene_path = path::Path::new(&args.scene_path);
-    // let output_path = path::Path::new(&args.output_path);
-    // raytracer::compute_image(args.ssaa, args.depth, scene_path, output_path);
-    let scene_path = path::Path::new("./scenes/spheres/spheres.yaml");
-    let output_path = path::Path::new("./scenes/spheres/spheres.png");
-    raytracer::compute_image(
-        raytracer::SuperSampling::Jitter(2),
-        5,
-        scene_path,
-        output_path,
-    );
+    let args = Args::parse();
+    let scene_path = path::Path::new(&args.scene_path);
+    let output_path = path::Path::new(&args.output_path);
+    raytracer::compute_image(args.ssaa, args.depth, scene_path, output_path);
 }
