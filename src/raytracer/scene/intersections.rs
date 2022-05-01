@@ -16,7 +16,7 @@ pub trait Intersectable {
 
 /// Information about a ray-object intersection.
 /// Contains the intersection point, normal, material of the intersected object and the `t` for which the intersection occurs.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct IntersectionInfo {
     pub point: Vector3,
     pub normal: Vector3,
@@ -237,5 +237,141 @@ impl AABB {
             // }
         }
         return true;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        math::Vector3,
+        raytracer::{
+            mesh::{Mesh, Triangle, AABB},
+            raytrace::Ray,
+            scene::{Material, Plane, Sphere},
+        },
+    };
+
+    use super::Intersectable;
+
+    #[test]
+    fn test_aabb_intersection() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0));
+        let aabb = AABB::new(Vector3::new(0.0, 2.0, 0.0), Vector3::new(1.0, 2.0, 1.0));
+        let aabb_neg = AABB::new(Vector3::new(1.0, 0.0, 1.0), Vector3::new(2.0, 1.0, 2.0));
+
+        assert!(aabb.intersect(&ray));
+        assert!(!aabb_neg.intersect(&ray));
+    }
+
+    #[test]
+    fn test_aabb_intersection_inside() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let aabb = AABB::new(Vector3::new(-1.0, -1.0, -1.0), Vector3::new(1.0, 1.0, 1.0));
+
+        assert!(aabb.intersect(&ray));
+    }
+
+    #[test]
+    fn test_mesh_intersection() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let mut mesh = Mesh::new();
+        mesh.vertex_positions.push(Vector3::new(5.0, -1.0, -1.0));
+        mesh.vertex_positions.push(Vector3::new(5.0, 1.0, 0.0));
+        mesh.vertex_positions.push(Vector3::new(5.0, -1.0, 1.0));
+        let mut mat = Material::default();
+        mat.ambient_color.r = 1.0;
+        mesh.materials.push(mat);
+        let triangle = Triangle::new([0, 1, 2], 0);
+        mesh.triangles.push(triangle);
+
+        let intersection = mesh.intersect(&ray);
+        assert!(intersection.is_some());
+        let intersection = intersection.unwrap();
+        assert_eq!(intersection.point, Vector3::new(5.0, 0.0, 0.0));
+        assert_eq!(intersection.normal, Vector3::new(1.0, 0.0, 0.0));
+        assert_eq!(intersection.material.ambient_color.r, 1.0);
+        assert_eq!(intersection.t, 5.0);
+    }
+
+    #[test]
+    fn test_mesh_intersection_negative() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let mut mesh = Mesh::new();
+        mesh.vertex_positions.push(Vector3::new(5.0, 1.0, -1.0));
+        mesh.vertex_positions.push(Vector3::new(5.0, 1.0, 0.0));
+        mesh.vertex_positions.push(Vector3::new(5.0, 1.0, 1.0));
+        let triangle = Triangle::new([0, 1, 2], 0);
+        mesh.triangles.push(triangle);
+
+        mesh.compute_aabb();
+
+        let intersection = mesh.intersect(&ray);
+        assert!(intersection.is_none());
+    }
+
+    #[test]
+    fn test_sphere_intersection() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let mut mat = Material::default();
+        mat.ambient_color.r = 1.0;
+        let sphere = Sphere {
+            center: Vector3::new(2.0, 0.0, 1.0),
+            radius: 1.0,
+            material: mat,
+        };
+
+        let intersection = sphere.intersect(&ray);
+        assert!(intersection.is_some());
+        let intersection = intersection.unwrap();
+        assert_eq!(intersection.point, Vector3::new(2.0, 0.0, 0.0));
+        assert_eq!(intersection.normal, Vector3::new(0.0, 0.0, -1.0));
+        assert_eq!(intersection.material.ambient_color.r, 1.0);
+        assert_eq!(intersection.t, 2.0);
+    }
+
+    #[test]
+    fn test_sphere_intersection_negative() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let sphere = Sphere {
+            center: Vector3::new(0.0, 1.0, 0.0),
+            radius: 0.5,
+            material: Material::default(),
+        };
+
+        let intersection = sphere.intersect(&ray);
+        assert!(intersection.is_none());
+    }
+
+    #[test]
+    fn test_plane_intersection() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let mut mat = Material::default();
+        mat.ambient_color.r = 1.0;
+        let plane = Plane {
+            center: Vector3::new(2.0, 0.0, 0.0),
+            normal: Vector3::new(-1.0, 0.0, 0.0),
+            material: mat,
+        };
+
+        let intersection = plane.intersect(&ray);
+        assert!(intersection.is_some());
+        let intersection = intersection.unwrap();
+        assert_eq!(intersection.point, Vector3::new(2.0, 0.0, 0.0));
+        assert_eq!(intersection.normal, Vector3::new(-1.0, 0.0, 0.0));
+        assert_eq!(intersection.material.ambient_color.r, 1.0);
+        assert_eq!(intersection.t, 2.0);
+    }
+
+    #[test]
+    fn test_plane_intersection_negative() {
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+        let plane = Plane {
+            center: Vector3::new(-1.0, 0.0, 0.0),
+            normal: Vector3::new(1.0, 0.0, 0.0),
+            material: Material::default(),
+        };
+
+        let intersection = plane.intersect(&ray);
+        assert!(intersection.is_none());
     }
 }

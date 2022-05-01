@@ -359,7 +359,7 @@ pub struct Mesh {
 
 impl Mesh {
     /// Creates a new Mesh
-    fn new() -> Mesh {
+    pub fn new() -> Mesh {
         Mesh {
             triangles: Vec::new(),
             materials: Vec::new(),
@@ -396,7 +396,7 @@ impl AABB {
     ///
     /// * `min` minimum bounding point of the AABB
     /// * `max` maximum bounding point of the AABB
-    fn new(min: Vector3, max: Vector3) -> AABB {
+    pub fn new(min: Vector3, max: Vector3) -> AABB {
         AABB { min, max }
     }
 }
@@ -418,7 +418,7 @@ impl Triangle {
     ///
     /// * `vertex_idx` Array containing the three vertex indices in the vertex position list of the mesh
     /// * `material_idx` Index of the material in the mesh's material list
-    fn new(vertex_idx: [usize; 3], material_idx: usize) -> Triangle {
+    pub fn new(vertex_idx: [usize; 3], material_idx: usize) -> Triangle {
         Triangle {
             vertex_idx,
             normal_idx: None,
