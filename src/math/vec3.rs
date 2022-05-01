@@ -1,3 +1,4 @@
+use rand::Rng;
 use serde::{Deserialize, Deserializer};
 use std::ops::{self, Index, IndexMut};
 
@@ -18,6 +19,41 @@ impl Vector3 {
     /// * `z` z value of the vector
     pub fn new(x: f64, y: f64, z: f64) -> Vector3 {
         Vector3 { data: [x, y, z] }
+    }
+
+    /// Creates a random vector with each coordinate in the given bounds.
+    ///
+    /// # Arguments
+    ///
+    /// * `min` minimum of the rng range
+    /// * `max` maximum of the rng range (inclusive)
+    pub fn random(min: f64, max: f64) -> Vector3 {
+        let mut rng = rand::thread_rng();
+        Vector3::new(
+            rng.gen_range(min..=max),
+            rng.gen_range(min..=max),
+            rng.gen_range(min..=max),
+        )
+    }
+
+    /// Creates a random vector in the unit sphere
+    pub fn random_in_unit_sphere() -> Vector3 {
+        loop {
+            let v = Vector3::random(-1.0, 1.0);
+            if v.sqr_len() < 1.0 {
+                return v;
+            }
+        }
+    }
+
+    /// Creates a random unit vector
+    pub fn random_unit_vector() -> Vector3 {
+        Vector3::random_in_unit_sphere().normalized()
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let epsilon = 1e-8;
+        f64::abs(self[0]) < epsilon && f64::abs(self[1]) < epsilon && f64::abs(self[2]) < epsilon
     }
 
     /// Returns the x coordinate of the vector

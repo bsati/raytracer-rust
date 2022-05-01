@@ -1,4 +1,5 @@
 mod intersections;
+mod materials;
 mod mesh;
 mod scene;
 
