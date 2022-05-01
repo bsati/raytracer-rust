@@ -17,6 +17,7 @@ scene:
         u: [0, 0, 4]
         v: [0, 4, 0]
         grid_resolution: 12
+        deterministic: false
   objects:
     - type: Mesh
       path: './scenes/cube/cube.obj'

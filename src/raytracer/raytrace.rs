@@ -51,7 +51,7 @@ impl Ray {
 
         let intersection = scene_config.scene.get_closest_interesection(self);
         if let Some(intersection_info) = intersection {
-            let mut color = scene_config.scene.compute_phong_lighting(
+            let mut color = scene_config.scene.compute_phong_shading(
                 &intersection_info.point,
                 &intersection_info.normal,
                 &-self.direction,

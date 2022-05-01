@@ -14,9 +14,10 @@ scene:
       light_info:
         type: Area
         corner: [50, 50, 50]
-        u: [0, 20, 0]
-        v: [0, 0, 20]
+        u: [0, 50, 0]
+        v: [0, 0, 50]
         grid_resolution: 8
+        deterministic: false
   objects:
     - type: Sphere
       center: [0, 1, 0]

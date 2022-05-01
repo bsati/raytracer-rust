@@ -1,4 +1,5 @@
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rand::Rng;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 
 use crate::{
@@ -66,20 +67,20 @@ impl Scene {
         info
     }
 
-    /// Returns whether a given point should be colored with diffuse and specular color.
+    /// Returns whether a given point is affected by the light at `light_pos` and should be colored with diffuse and specular lighting.
     ///
-    /// Depends on whether the point is being shadowed by another object or not.
+    /// Depends on whether the point is being shadowed by another object.
     /// For a light `l` and point `p` the ray is constructed as `origin = p` and `direction = ||l.position - p||`.
     /// If `p` is being shadowed there has to be an intersection `i` with object `o` where `||l.position - p|| > ||l.position - i.position||`
     ///
     /// # Arguments
     ///
     /// * `point` the point to check
-    /// * `lp_vec` vector from point to light
-    /// * `lp_vec_normalized` `lp_vec` normalized
+    /// * `light_pos` position of the light
     #[inline]
-    fn should_color(&self, point: &Vector3, lp_vec: &Vector3, lp_vec_normalized: &Vector3) -> bool {
-        let ray = Ray::new(*point, *lp_vec_normalized);
+    fn should_color(&self, point: &Vector3, light_pos: &Vector3) -> bool {
+        let lp_vec = *light_pos - *point;
+        let ray = Ray::new(*point, lp_vec);
         let shadow_intersection = self.get_closest_interesection(&ray);
         match shadow_intersection {
             Some(info) => {
@@ -98,7 +99,7 @@ impl Scene {
     /// * `normal` Normal of the object intersection
     /// * `view` Position where the point / object is being viewed from
     /// * `material` Material of the hit object
-    pub fn compute_phong_lighting(
+    pub fn compute_phong_shading(
         &self,
         point: &Vector3,
         normal: &Vector3,
@@ -108,24 +109,31 @@ impl Scene {
         let mut c = material.ambient_color * self.ambient_light;
 
         for l in &self.lights {
-            let mut l_color = l
-                .samples
+            let indices: Vec<usize> = (0..l.samples.len())
+                .into_par_iter()
+                .filter(|idx| {
+                    let light_point = &l.samples[*idx];
+                    self.should_color(point, light_point)
+                })
+                .collect();
+            let intensity = indices.len() as f64 / l.samples.len() as f64;
+            let mut l_color = indices
                 .par_iter()
-                .map(|l_vec| {
+                .map(|idx| {
+                    let l_vec = &l.samples[*idx];
                     let mut light_color = Color::new(0.0, 0.0, 0.0);
                     let lp_vec = *l_vec - *point;
                     let lp_vec_normalized = lp_vec.normalized();
-                    if self.should_color(point, &lp_vec, &lp_vec_normalized) {
-                        let r = lp_vec_normalized.mirror(normal);
-                        let dot_l = normal.dot(&lp_vec_normalized);
-                        if dot_l >= 0.0 {
-                            light_color += l.color * (material.diffuse_color * dot_l);
+                    let r = lp_vec_normalized.mirror(normal);
+                    let dot_l = normal.dot(&lp_vec_normalized);
+                    if dot_l >= 0.0 {
+                        light_color += l.color * intensity * (material.diffuse_color * dot_l);
 
-                            let dot_r = view.dot(&r);
-                            if dot_r >= 0.0 {
-                                let shininess = dot_r.powf(material.shininess);
-                                light_color += material.specular_color * l.color * shininess;
-                            }
+                        let dot_r = view.dot(&r);
+                        if dot_r >= 0.0 {
+                            let shininess = dot_r.powf(material.shininess);
+                            light_color +=
+                                material.specular_color * l.color * intensity * shininess;
                         }
                     }
 
@@ -180,13 +188,25 @@ impl LightInfo {
             LightInfo::Area(area_light) => {
                 let resolution = area_light.grid_resolution;
                 let mut result = Vec::with_capacity(resolution * resolution);
+                let mut rng = rand::thread_rng();
+                let resolution_f = resolution as f64;
+                let u_step = area_light.u / resolution_f;
+                let v_step = area_light.v / resolution_f;
                 for i in 0..resolution {
                     for j in 0..resolution {
-                        result.push(
-                            area_light.corner
-                                + (area_light.u / i as f64)
-                                + (area_light.v / j as f64),
-                        );
+                        let i_f = i as f64;
+                        let j_f = j as f64;
+                        if area_light.deterministic {
+                            result.push(
+                                area_light.corner + u_step * (i_f + 0.5) + v_step * (j_f + 0.5),
+                            );
+                        } else {
+                            result.push(
+                                area_light.corner
+                                    + u_step * (i_f + rng.gen_range(0.0..1.0))
+                                    + v_step * (j_f + rng.gen_range(0.0..1.0)),
+                            )
+                        }
                     }
                 }
                 result
@@ -209,6 +229,7 @@ struct AreaLight {
     u: Vector3,
     v: Vector3,
     grid_resolution: usize,
+    deterministic: bool,
 }
 
 #[derive(Deserialize)]
@@ -276,5 +297,45 @@ impl Material {
             shininess: -1.0,
             mirror: 0.0,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{math::Vector3, raytracer::image::Color};
+
+    use super::{AreaLight, LightInfo, Material, Object, Plane, Scene};
+
+    #[test]
+    fn test_should_color() {
+        let light_source = AreaLight {
+            corner: Vector3::new(5.0, 0.0, 0.0),
+            u: Vector3::new(0.0, 0.0, 5.0),
+            v: Vector3::new(0.0, 5.0, 0.0),
+            grid_resolution: 2,
+            deterministic: true,
+        };
+        let samples = LightInfo::Area(light_source).sample();
+        let plane = Plane {
+            center: Vector3::new(5.0, 0.0, 2.5),
+            normal: Vector3::new(0.0, 0.0, -1.0),
+            material: Material::default(),
+        };
+        let point = Vector3::new(0.0, 0.0, 0.0);
+
+        let scene = Scene {
+            ambient_light: Color::default(),
+            lights: Vec::new(),
+            objects: vec![Object::Plane(plane)],
+        };
+
+        let mut negative_count = 0;
+        for s in samples {
+            if !scene.should_color(&point, &s) {
+                negative_count += 1;
+            }
+        }
+
+        assert_eq!(negative_count, 2);
     }
 }
