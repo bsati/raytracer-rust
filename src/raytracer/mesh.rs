@@ -354,6 +354,7 @@ pub struct Mesh {
     pub vertex_positions: Vec<Vector3>,
     pub normals: Vec<Vector3>,
     pub uvs: Vec<(f64, f64)>,
+    pub aabb: Option<AABB>,
 }
 
 impl Mesh {
@@ -365,7 +366,38 @@ impl Mesh {
             vertex_positions: Vec::new(),
             normals: Vec::new(),
             uvs: Vec::new(),
+            aabb: None,
         }
+    }
+
+    /// Computes the AABB of the mesh and stores it in itsself
+    pub fn compute_aabb(&mut self) {
+        let mut bb_min = Vector3::new(f64::MAX, f64::MAX, f64::MAX);
+        let mut bb_max = Vector3::new(f64::MIN, f64::MIN, f64::MIN);
+        for vp in &self.vertex_positions {
+            bb_min = bb_min.min(vp);
+            bb_max = bb_max.max(vp);
+        }
+        self.aabb = Some(AABB::new(bb_min, bb_max))
+    }
+}
+
+/// Representation of an axis-aligned bounding box
+#[derive(Clone, Debug)]
+pub struct AABB {
+    pub min: Vector3,
+    pub max: Vector3,
+}
+
+impl AABB {
+    /// Creates a new AABB with the given min and max points
+    ///
+    /// # Arguments
+    ///
+    /// * `min` minimum bounding point of the AABB
+    /// * `max` maximum bounding point of the AABB
+    fn new(min: Vector3, max: Vector3) -> AABB {
+        AABB { min, max }
     }
 }
 

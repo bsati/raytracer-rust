@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer};
 
 use super::{
     image::Color,
-    mesh::{load_obj, Mesh},
+    mesh::{load_obj, Mesh, AABB},
     raytrace::Ray,
 };
 
@@ -138,6 +138,11 @@ impl Scene {
     pub fn precompute(&mut self) {
         for l in &mut self.lights {
             l.compute_samples();
+        }
+        for m in &mut self.objects {
+            if let Object::Mesh(mesh) = m {
+                mesh.compute_aabb();
+            }
         }
     }
 }
@@ -381,8 +386,8 @@ impl Intersectable for Plane {
 /// * `v3` Vector representing the right column
 #[inline]
 fn calculate_determinant(v1: &Vector3, v2: &Vector3, v3: &Vector3) -> f64 {
-    (v1.x * v2.y * v3.z + v2.x * v3.y * v1.z + v3.x * v1.y * v2.z)
-        - (v3.x * v2.y * v1.z + v2.x * v1.y * v3.z + v1.x * v3.y * v2.z)
+    (v1[0] * v2[1] * v3[2] + v2[0] * v3[1] * v1[2] + v3[0] * v1[1] * v2[2])
+        - (v3[0] * v2[1] * v1[2] + v2[0] * v1[1] * v3[2] + v1[0] * v3[1] * v2[2])
 }
 
 impl Intersectable for Mesh {
@@ -398,6 +403,13 @@ impl Intersectable for Mesh {
     /// The Matrix on the left hand side is represented as three column vectors.
     fn intersect(&self, ray: &Ray) -> Option<IntersectionInfo> {
         let mut result: Option<IntersectionInfo> = None;
+
+        if let Some(bb) = &self.aabb {
+            if !bb.intersect(ray) {
+                return None;
+            }
+        }
+
         for triangle in &self.triangles {
             let pos_idx = triangle.vertex_idx;
             let a = self.vertex_positions[pos_idx[0]];
@@ -431,5 +443,66 @@ impl Intersectable for Mesh {
         }
 
         result
+    }
+}
+
+impl AABB {
+    /// Checks if the ray intersects the AABB and returns `true` if the ray intersects or false if it doesn't.
+    /// The implementation is derived from Andrew Woo's: Fast Ray-Box Intersection implemented in C.
+    fn intersect(&self, ray: &Ray) -> bool {
+        const LEFT: u8 = 0;
+        const RIGHT: u8 = 1;
+        const MIDDLE: u8 = 2;
+        const NONE: u8 = 3;
+
+        let mut quadrant = [NONE; 3];
+        let mut candidate_plane = [-1.0; 3];
+        let mut inside = true;
+        for i in 0..3 {
+            if ray.origin[i] < self.min[i] {
+                quadrant[i] = LEFT;
+                candidate_plane[i] = self.min[i];
+                inside = false;
+            } else if ray.origin[i] > self.max[i] {
+                quadrant[i] = RIGHT;
+                candidate_plane[i] = self.max[i];
+                inside = false;
+            } else {
+                quadrant[i] = MIDDLE;
+            }
+        }
+
+        if inside {
+            // coords = origin
+            return true;
+        }
+
+        let mut max_t = [-1.0; 3];
+        for i in 0..3 {
+            if quadrant[i] != MIDDLE && ray.direction[i] != 0.0 {
+                max_t[i] = (candidate_plane[i] - ray.origin[i]) / ray.direction[i];
+            }
+        }
+
+        let mut which_plane = 0;
+        for i in 0..3 {
+            if max_t[which_plane] < max_t[i] {
+                which_plane = i;
+            }
+        }
+
+        let mut coords = [0.0; 3];
+        for i in 0..3 {
+            if which_plane != i {
+                coords[i] = ray.origin[i] + max_t[which_plane] * ray.direction[i];
+                if coords[i] < self.min[i] || coords[i] > self.max[i] {
+                    return false;
+                }
+            }
+            // else {
+            //     coords[i] = candidate_plane[i];
+            // }
+        }
+        return true;
     }
 }

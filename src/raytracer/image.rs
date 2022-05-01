@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::io::BufWriter;
 use std::ops::{Add, AddAssign, DivAssign, Mul};
@@ -6,7 +6,7 @@ use std::ops::{Add, AddAssign, DivAssign, Mul};
 use crate::math::Vector3;
 
 /// Struct representation of RGB-Colors
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Color {
     pub r: f64,
     pub g: f64,
@@ -52,12 +52,25 @@ impl Color {
     }
 }
 
+impl<'de> Deserialize<'de> for Color {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
+        let r = val.get(0).unwrap().as_f64().unwrap();
+        let g = val.get(1).unwrap().as_f64().unwrap();
+        let b = val.get(2).unwrap().as_f64().unwrap();
+        Ok(Color::new(r, g, b))
+    }
+}
+
 impl From<Vector3> for Color {
     fn from(vec: Vector3) -> Self {
         Color {
-            r: vec.x,
-            g: vec.y,
-            b: vec.z,
+            r: vec.x(),
+            g: vec.y(),
+            b: vec.z(),
         }
     }
 }
