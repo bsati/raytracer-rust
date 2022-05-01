@@ -1,12 +1,9 @@
-use crate::{
-    math::Vector3,
-    raytracer::{
-        mesh::{Mesh, AABB},
-        raytrace::Ray,
-    },
-};
+use crate::{math::Vector3, raytracer::raytrace::Ray};
 
-use super::scene::{Material, Plane, Sphere};
+use super::{
+    mesh::{Mesh, AABB},
+    scene::{Material, Plane, Sphere},
+};
 
 pub trait Intersectable {
     /// Checks if the ray intersects the object and returns the corresponding `IntersectionInfo` if it does
@@ -245,9 +242,11 @@ mod test {
     use crate::{
         math::Vector3,
         raytracer::{
-            mesh::{Mesh, Triangle, AABB},
             raytrace::Ray,
-            scene::{Material, Plane, Sphere},
+            scene::{
+                mesh::{Mesh, Triangle, AABB},
+                Material, Plane, Sphere,
+            },
         },
     };
 

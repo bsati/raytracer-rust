@@ -4,14 +4,13 @@ use serde::{Deserialize, Deserializer};
 
 use crate::{
     math::Vector3,
-    raytracer::{
-        image::Color,
-        mesh::{self, Mesh},
-        raytrace::Ray,
-    },
+    raytracer::{image::Color, raytrace::Ray},
 };
 
-use super::intersections::{Intersectable, IntersectionInfo};
+use super::{
+    intersections::{Intersectable, IntersectionInfo},
+    mesh::{self, Mesh},
+};
 
 #[derive(Deserialize)]
 pub struct SceneConfig {
@@ -178,7 +177,6 @@ impl Light {
 enum LightInfo {
     Point(PointLight),
     Area(AreaLight),
-    Sphere(SphereLight),
 }
 
 impl LightInfo {
@@ -210,9 +208,6 @@ impl LightInfo {
                     }
                 }
                 result
-            }
-            LightInfo::Sphere(sphere_light) => {
-                vec![]
             }
         }
     }
