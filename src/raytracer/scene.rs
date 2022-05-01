@@ -392,7 +392,7 @@ fn calculate_determinant(v1: &Vector3, v2: &Vector3, v3: &Vector3) -> f64 {
 
 impl Intersectable for Mesh {
     /// Intersection testing of a mesh happens in two steps:
-    /// - test the AABB of the mesh (TODO)
+    /// - test the AABB of the mesh
     /// - test each triangle of the mesh and find the closest intersection (if any exist)
     ///
     /// Triangle intersection is implemented via barycentric coordinates.
