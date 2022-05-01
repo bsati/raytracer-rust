@@ -76,7 +76,7 @@ impl std::str::FromStr for SuperSampling {
                     )),
                 }
             }
-            _ => Err(SSAADecodeError::new("unkown method".to_string())),
+            _ => Err(SSAADecodeError::new("unknown method".to_string())),
         }
     }
 }
@@ -96,13 +96,174 @@ fn jitter_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> 
     let mut rng = rand::thread_rng();
     let step: f64 = 1.0 / resolution as f64;
     let mut samples = Vec::with_capacity((resolution * resolution) as usize);
-    for i in 1..resolution + 1 {
-        for j in 1..resolution + 1 {
+    for i in 0..resolution {
+        for j in 0..resolution {
             samples.push((
-                rng.gen_range(base_x..(base_x + i as f64 * step)),
-                rng.gen_range(base_y..(base_y + j as f64 * step)),
+                base_x + (i as f64 * step) + rng.gen_range(0.0..step),
+                base_y + (j as f64 * step) + rng.gen_range(0.0..step),
             ));
         }
     }
     samples
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    #[test]
+    fn test_grid_sampling_single() {
+        let samples = super::uniform_grid_sampling(1, 0.0, 0.0);
+        assert_eq!(
+            samples.len(),
+            1,
+            "invalid sample count: expected 1 got {}",
+            samples.len()
+        );
+        assert_eq!(
+            samples[0],
+            (0.0, 0.0),
+            "invalid sample: expected (0.0, 0.0) got {:?}",
+            samples[0]
+        );
+    }
+
+    #[test]
+    fn test_grid_sampling_multiple() {
+        let samples = super::uniform_grid_sampling(2, 0.0, 0.0);
+        assert_eq!(
+            samples.len(),
+            4,
+            "invalid sample count: expected 4 got {}",
+            samples.len()
+        );
+        assert_eq!(
+            samples[0],
+            (0.0, 0.0),
+            "invalid samples: expected sample 0 to be (0.0, 0.0) got {:?}",
+            samples[0]
+        );
+        assert_eq!(
+            samples[1],
+            (0.0, 0.5),
+            "invalid samples: expected sample 1 to be (0.0, 0.5) got {:?}",
+            samples[1]
+        );
+        assert_eq!(
+            samples[2],
+            (0.5, 0.0),
+            "invalid samples: expected sample 2 to be (0.5, 0.0) got {:?}",
+            samples[2]
+        );
+        assert_eq!(
+            samples[3],
+            (0.5, 0.5),
+            "invalid samples: expected sample 3 to be (0.5, 0.5) got {:?}",
+            samples[3]
+        );
+    }
+
+    #[test]
+    fn test_jitter_sampling() {
+        let samples = super::jitter_sampling(2, 0.0, 0.0);
+        assert_eq!(
+            samples.len(),
+            4,
+            "invalid sample count: expected 4 got {}",
+            samples.len()
+        );
+        assert!(
+            samples[0].0 >= 0.0
+                && samples[0].0 <= 0.5
+                && samples[0].1 >= 0.0
+                && samples[0].1 <= 0.5, "invalid samples: expected sample 0 to be (x, y) with x in [0.0, 0.5] and y in [0.0, 0.5] got {:?}", samples[0]
+        );
+        assert!(
+            samples[1].0 >= 0.0
+                && samples[1].0 <= 0.5
+                && samples[1].1 >= 0.5
+                && samples[1].1 <= 1.0, "invalid samples: expected sample 0 to be (x, y) with x in [0.0, 0.5] and y in [0.5, 1.0] got {:?}", samples[0]
+        );
+        assert!(
+            samples[2].0 >= 0.5
+                && samples[2].0 <= 1.0
+                && samples[2].1 >= 0.0
+                && samples[2].1 <= 0.5, "invalid samples: expected sample 0 to be (x, y) with x in [0.5, 1.0] and y in [0.0, 0.5] got {:?}", samples[0]
+        );
+        assert!(
+            samples[3].0 >= 0.5
+                && samples[3].0 <= 1.0
+                && samples[3].1 >= 0.5
+                && samples[3].1 <= 1.0, "invalid samples: expected sample 0 to be (x, y) with x in [0.5, 1.0] and y in [0.5, 1.0] got {:?}", samples[0]
+        );
+    }
+
+    #[test]
+    fn test_ssaa_uniform_from_str() {
+        let valid_uniform = super::SuperSampling::from_str("uniform:2");
+        assert!(
+            valid_uniform.is_ok(),
+            "expected from_str to return ok got {:?}",
+            valid_uniform.err().unwrap()
+        );
+        let valid_samples_len = valid_uniform.unwrap().sample(0, 0).len();
+        assert_eq!(
+            valid_samples_len,
+            4,
+            "expected resolution 2 got {}",
+            f64::sqrt(valid_samples_len as f64)
+        );
+        let invalid_uniform = super::SuperSampling::from_str("uniform");
+        assert!(
+            invalid_uniform.is_err()
+                && invalid_uniform.err().unwrap().error
+                    == "no arguments supplied, need resolution for uniform",
+            "expected no args error from invalid uniform"
+        );
+        let invalid_uniform_arg = super::SuperSampling::from_str("uniform:invalid");
+        assert!(
+            invalid_uniform_arg.is_err()
+                && invalid_uniform_arg.err().unwrap().error == "resolution has to be an integer",
+            "expected wrong datatype error from invalid uniform"
+        );
+    }
+
+    #[test]
+    fn test_ssaa_jitter_from_str() {
+        let valid_jitter = super::SuperSampling::from_str("jitter:2");
+        assert!(
+            valid_jitter.is_ok(),
+            "expected from_str to return ok got {:?}",
+            valid_jitter.err().unwrap()
+        );
+        let valid_samples_len = valid_jitter.unwrap().sample(0, 0).len();
+        assert_eq!(
+            valid_samples_len,
+            4,
+            "expected resolution 2 got {}",
+            f64::sqrt(valid_samples_len as f64)
+        );
+        let invalid_jitter = super::SuperSampling::from_str("jitter");
+        assert!(
+            invalid_jitter.is_err()
+                && invalid_jitter.err().unwrap().error
+                    == "no arguments supplied, need resolution for jitter",
+            "expected no args error from invalid jitter"
+        );
+        let invalid_uniform_arg = super::SuperSampling::from_str("jitter:invalid");
+        assert!(
+            invalid_uniform_arg.is_err()
+                && invalid_uniform_arg.err().unwrap().error == "resolution has to be an integer",
+            "expected wrong datatype error from invalid jitter"
+        );
+    }
+
+    #[test]
+    fn test_ssaa_invalid_method_from_str() {
+        let invalid_method = super::SuperSampling::from_str("invalid");
+        assert!(
+            invalid_method.is_err() && invalid_method.err().unwrap().error == "unknown method",
+            "expected unknown method error"
+        )
+    }
 }

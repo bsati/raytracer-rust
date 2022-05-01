@@ -8,19 +8,6 @@ pub struct Vector3 {
     data: [f64; 3],
 }
 
-impl<'de> Deserialize<'de> for Vector3 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
-        let x = val.get(0).unwrap().as_f64().unwrap();
-        let y = val.get(1).unwrap().as_f64().unwrap();
-        let z = val.get(2).unwrap().as_f64().unwrap();
-        Ok(Vector3::new(x, y, z))
-    }
-}
-
 impl Vector3 {
     /// Creates a new vector for the given coordinates.
     ///
@@ -144,6 +131,27 @@ impl Vector3 {
             f64::max(self[1], other[1]),
             f64::max(self[2], other[2]),
         )
+    }
+}
+
+impl<'de> Deserialize<'de> for Vector3 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
+        let x = val.get(0).unwrap().as_f64().unwrap();
+        let y = val.get(1).unwrap().as_f64().unwrap();
+        let z = val.get(2).unwrap().as_f64().unwrap();
+        Ok(Vector3::new(x, y, z))
+    }
+}
+
+impl PartialEq<Vector3> for Vector3 {
+    fn eq(&self, other: &Vector3) -> bool {
+        self.data[0] == other.data[0]
+            && self.data[1] == other.data[1]
+            && self.data[2] == other.data[2]
     }
 }
 
