@@ -12,6 +12,7 @@ pub trait Scatter {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "type")]
 pub enum Material {
     Lambertian(LambertianMaterial),
     Metal(MetalMaterial),

@@ -202,7 +202,10 @@ impl<'de> Deserialize<'de> for Mesh {
     {
         let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
         let path = std::path::Path::new(val.get("path").unwrap().as_str().unwrap());
-        let materials = HashMap::new();
+        let materials = val.get("materials").unwrap();
+
+        let materials: HashMap<String, Material> =
+            serde_yaml::from_value(materials.clone()).unwrap();
         let meshes = mesh::load_obj(path, &materials);
         Ok(meshes[0].to_owned())
     }
