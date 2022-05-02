@@ -3,8 +3,8 @@ use rand::Rng;
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum SuperSampling {
-    Uniform(u8),
-    Jitter(u8),
+    Uniform(usize),
+    Jitter(usize),
 }
 
 impl SuperSampling {
@@ -54,7 +54,7 @@ impl std::str::FromStr for SuperSampling {
                         "no arguments supplied, need resolution for jitter".to_string(),
                     ));
                 }
-                let resolution = method_args[1].parse::<u8>();
+                let resolution = method_args[1].parse::<usize>();
                 match resolution {
                     Ok(res) => Ok(SuperSampling::Jitter(res)),
                     Err(_) => Err(SSAADecodeError::new(
@@ -68,7 +68,7 @@ impl std::str::FromStr for SuperSampling {
                         "no arguments supplied, need resolution for uniform".to_string(),
                     ));
                 }
-                let resolution = method_args[1].parse::<u8>();
+                let resolution = method_args[1].parse::<usize>();
                 match resolution {
                     Ok(res) => Ok(SuperSampling::Jitter(res)),
                     Err(_) => Err(SSAADecodeError::new(
@@ -81,7 +81,7 @@ impl std::str::FromStr for SuperSampling {
     }
 }
 
-fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
+fn uniform_grid_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
     let step: f64 = 1.0 / resolution as f64;
     let mut samples = Vec::with_capacity((resolution * resolution) as usize);
     for i in 0..resolution {
@@ -92,10 +92,10 @@ fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, 
     samples
 }
 
-fn jitter_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
+fn jitter_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
     let mut rng = rand::thread_rng();
     let step: f64 = 1.0 / resolution as f64;
-    let mut samples = Vec::with_capacity((resolution * resolution) as usize);
+    let mut samples = Vec::with_capacity(resolution * resolution);
     for i in 0..resolution {
         for j in 0..resolution {
             samples.push((
