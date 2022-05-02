@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::{
     math::Vector3,
     raytracer::{image::Color, raytrace::Ray},
@@ -9,12 +11,13 @@ pub trait Scatter {
     fn scatter(&self, ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)>;
 }
 
+#[derive(Clone, Debug, Deserialize)]
 pub enum Material {
     Lambertian(LambertianMaterial),
     Metal(MetalMaterial),
     Dieletrics(DielectricsMaterial),
     //Texture,
-    Light(LightMaterial),
+    Emissive(EmissiveMaterial),
 }
 
 impl Scatter for Material {
@@ -23,13 +26,21 @@ impl Scatter for Material {
             Material::Lambertian(l) => l.scatter(ray, intersection),
             Material::Metal(m) => m.scatter(ray, intersection),
             Material::Dieletrics(d) => d.scatter(ray, intersection),
-            Material::Light(l) => l.scatter(ray, intersection),
+            Material::Emissive(l) => l.scatter(ray, intersection),
         }
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
 pub struct LambertianMaterial {
     albedo: Color,
+    roughness: f64,
+}
+
+impl LambertianMaterial {
+    pub fn new(albedo: Color, roughness: f64) -> LambertianMaterial {
+        LambertianMaterial { albedo, roughness }
+    }
 }
 
 impl Scatter for LambertianMaterial {
@@ -48,11 +59,18 @@ impl Scatter for LambertianMaterial {
     }
 }
 
-pub struct LightMaterial {
-    color: Color,
+#[derive(Clone, Debug, Deserialize)]
+pub struct EmissiveMaterial {
+    pub color: Color,
 }
 
-impl Scatter for LightMaterial {
+impl EmissiveMaterial {
+    pub fn new(color: Color) -> EmissiveMaterial {
+        EmissiveMaterial { color }
+    }
+}
+
+impl Scatter for EmissiveMaterial {
     fn scatter(
         &self,
         _ray: &Ray,
@@ -62,6 +80,7 @@ impl Scatter for LightMaterial {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
 pub struct DielectricsMaterial {
     tint: Color,
     refraction_index: f64,
@@ -89,6 +108,7 @@ impl Scatter for DielectricsMaterial {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
 pub struct MetalMaterial {
     albedo: Color,
     fuzziness: f64,

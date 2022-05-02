@@ -1,8 +1,9 @@
 use crate::{math::Vector3, raytracer::raytrace::Ray};
 
 use super::{
+    materials::Material,
     mesh::{Mesh, AABB},
-    scene::{Material, Plane, Sphere},
+    scene::{Plane, Sphere},
 };
 
 pub trait Intersectable {
@@ -14,15 +15,15 @@ pub trait Intersectable {
 /// Information about a ray-object intersection.
 /// Contains the intersection point, normal, material of the intersected object and the `t` for which the intersection occurs.
 #[derive(Clone, Copy, Debug)]
-pub struct IntersectionInfo {
+pub struct IntersectionInfo<'mat> {
     pub point: Vector3,
     pub normal: Vector3,
-    pub material: Material,
+    pub material: &'mat Material,
     pub t: f64,
 }
 
-impl IntersectionInfo {
-    fn new(point: Vector3, normal: Vector3, material: Material, t: f64) -> IntersectionInfo {
+impl IntersectionInfo<'_> {
+    fn new(point: Vector3, normal: Vector3, material: &Material, t: f64) -> IntersectionInfo {
         IntersectionInfo {
             point,
             normal,
@@ -66,7 +67,7 @@ impl Intersectable for Sphere {
             return Some(IntersectionInfo::new(
                 intersection_point,
                 intersection_normal,
-                self.material,
+                &self.material,
                 intersection_t,
             ));
         }
@@ -92,7 +93,7 @@ impl Intersectable for Plane {
         Some(IntersectionInfo::new(
             intersection_point,
             intersection_normal,
-            self.material,
+            &self.material,
             intersection_t,
         ))
     }
@@ -166,7 +167,7 @@ impl Intersectable for Mesh {
                 result = Some(IntersectionInfo::new(
                     ray.at_timestep(t),
                     normal,
-                    self.materials[triangle.material_idx],
+                    &self.materials[triangle.material_idx],
                     t,
                 ));
             }
@@ -242,10 +243,12 @@ mod test {
     use crate::{
         math::Vector3,
         raytracer::{
+            image::Color,
             raytrace::Ray,
             scene::{
+                materials::{EmissiveMaterial, Material},
                 mesh::{Mesh, Triangle, AABB},
-                Material, Plane, Sphere,
+                Plane, Sphere,
             },
         },
     };
@@ -277,9 +280,8 @@ mod test {
         mesh.vertex_positions.push(Vector3::new(5.0, -1.0, -1.0));
         mesh.vertex_positions.push(Vector3::new(5.0, 1.0, 0.0));
         mesh.vertex_positions.push(Vector3::new(5.0, -1.0, 1.0));
-        let mut mat = Material::default();
-        mat.ambient_color.r = 1.0;
-        mesh.materials.push(mat);
+        let mat = Material::Emissive(EmissiveMaterial::new(Color::new(1.0, 0.0, 0.0)));
+        mesh.materials.push(mat.clone());
         let triangle = Triangle::new([0, 1, 2], 0);
         mesh.triangles.push(triangle);
 
@@ -288,7 +290,11 @@ mod test {
         let intersection = intersection.unwrap();
         assert_eq!(intersection.point, Vector3::new(5.0, 0.0, 0.0));
         assert_eq!(intersection.normal, Vector3::new(1.0, 0.0, 0.0));
-        assert_eq!(intersection.material.ambient_color.r, 1.0);
+        if let Material::Emissive(em) = mat {
+            assert_eq!(em.color.r, 1.0);
+        } else {
+            assert!(false, "material not set correctly")
+        }
         assert_eq!(intersection.t, 5.0);
     }
 
@@ -311,12 +317,11 @@ mod test {
     #[test]
     fn test_sphere_intersection() {
         let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
-        let mut mat = Material::default();
-        mat.ambient_color.r = 1.0;
+        let mat = Material::Emissive(EmissiveMaterial::new(Color::new(1.0, 0.0, 0.0)));
         let sphere = Sphere {
             center: Vector3::new(2.0, 0.0, 1.0),
             radius: 1.0,
-            material: mat,
+            material: mat.clone(),
         };
 
         let intersection = sphere.intersect(&ray);
@@ -324,7 +329,11 @@ mod test {
         let intersection = intersection.unwrap();
         assert_eq!(intersection.point, Vector3::new(2.0, 0.0, 0.0));
         assert_eq!(intersection.normal, Vector3::new(0.0, 0.0, -1.0));
-        assert_eq!(intersection.material.ambient_color.r, 1.0);
+        if let Material::Emissive(em) = mat {
+            assert_eq!(em.color.r, 1.0);
+        } else {
+            assert!(false, "material not set correctly")
+        }
         assert_eq!(intersection.t, 2.0);
     }
 
@@ -334,7 +343,7 @@ mod test {
         let sphere = Sphere {
             center: Vector3::new(0.0, 1.0, 0.0),
             radius: 0.5,
-            material: Material::default(),
+            material: Material::Emissive(EmissiveMaterial::new(Color::new(1.0, 0.0, 0.0))),
         };
 
         let intersection = sphere.intersect(&ray);
@@ -344,12 +353,11 @@ mod test {
     #[test]
     fn test_plane_intersection() {
         let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
-        let mut mat = Material::default();
-        mat.ambient_color.r = 1.0;
+        let mat = Material::Emissive(EmissiveMaterial::new(Color::new(1.0, 0.0, 0.0)));
         let plane = Plane {
             center: Vector3::new(2.0, 0.0, 0.0),
             normal: Vector3::new(-1.0, 0.0, 0.0),
-            material: mat,
+            material: mat.clone(),
         };
 
         let intersection = plane.intersect(&ray);
@@ -357,7 +365,11 @@ mod test {
         let intersection = intersection.unwrap();
         assert_eq!(intersection.point, Vector3::new(2.0, 0.0, 0.0));
         assert_eq!(intersection.normal, Vector3::new(-1.0, 0.0, 0.0));
-        assert_eq!(intersection.material.ambient_color.r, 1.0);
+        if let Material::Emissive(em) = mat {
+            assert_eq!(em.color.r, 1.0);
+        } else {
+            assert!(false, "material not set correctly")
+        }
         assert_eq!(intersection.t, 2.0);
     }
 
@@ -367,7 +379,7 @@ mod test {
         let plane = Plane {
             center: Vector3::new(-1.0, 0.0, 0.0),
             normal: Vector3::new(1.0, 0.0, 0.0),
-            material: Material::default(),
+            material: Material::Emissive(EmissiveMaterial::new(Color::new(1.0, 0.0, 0.0))),
         };
 
         let intersection = plane.intersect(&ray);

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rand::Rng;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
@@ -9,6 +11,7 @@ use crate::{
 
 use super::{
     intersections::{Intersectable, IntersectionInfo},
+    materials::Material,
     mesh::{self, Mesh},
 };
 
@@ -88,62 +91,6 @@ impl Scene {
             }
             None => true,
         }
-    }
-
-    /// Computes the color of a point on an object from the given view via the Phong Lighting Model.
-    ///
-    /// # Arguments
-    ///
-    /// * `point` Point in space to calculate the color for
-    /// * `normal` Normal of the object intersection
-    /// * `view` Position where the point / object is being viewed from
-    /// * `material` Material of the hit object
-    pub fn compute_phong_shading(
-        &self,
-        point: &Vector3,
-        normal: &Vector3,
-        view: &Vector3,
-        material: &Material,
-    ) -> Color {
-        let mut c = material.ambient_color * self.ambient_light;
-
-        for l in &self.lights {
-            let indices: Vec<usize> = (0..l.samples.len())
-                .into_par_iter()
-                .filter(|idx| {
-                    let light_point = &l.samples[*idx];
-                    self.should_color(point, light_point)
-                })
-                .collect();
-            let intensity = indices.len() as f64 / l.samples.len() as f64;
-            let mut l_color = indices
-                .par_iter()
-                .map(|idx| {
-                    let l_vec = &l.samples[*idx];
-                    let mut light_color = Color::new(0.0, 0.0, 0.0);
-                    let lp_vec = *l_vec - *point;
-                    let lp_vec_normalized = lp_vec.normalized();
-                    let r = lp_vec_normalized.mirror(normal);
-                    let dot_l = normal.dot(&lp_vec_normalized);
-                    if dot_l >= 0.0 {
-                        light_color += l.color * intensity * (material.diffuse_color * dot_l);
-
-                        let dot_r = view.dot(&r);
-                        if dot_r >= 0.0 {
-                            let shininess = dot_r.powf(material.shininess);
-                            light_color +=
-                                material.specular_color * l.color * intensity * shininess;
-                        }
-                    }
-
-                    light_color
-                })
-                .reduce(|| Color::new(0.0, 0.0, 0.0), |a, b| a + b);
-            l_color /= l.samples.len() as f64;
-            c += l_color;
-        }
-
-        c
     }
 
     pub fn precompute(&mut self) {
@@ -255,7 +202,8 @@ impl<'de> Deserialize<'de> for Mesh {
     {
         let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
         let path = std::path::Path::new(val.get("path").unwrap().as_str().unwrap());
-        let meshes = mesh::load_obj(path);
+        let materials = HashMap::new();
+        let meshes = mesh::load_obj(path, &materials);
         Ok(meshes[0].to_owned())
     }
 }
@@ -274,32 +222,17 @@ pub struct Plane {
     pub material: Material,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug)]
-pub struct Material {
-    pub ambient_color: Color,
-    pub diffuse_color: Color,
-    pub specular_color: Color,
-    pub shininess: f64,
-    pub mirror: f64,
-}
-
-impl Material {
-    pub fn default() -> Material {
-        Material {
-            ambient_color: Color::default(),
-            diffuse_color: Color::default(),
-            specular_color: Color::default(),
-            shininess: -1.0,
-            mirror: 0.0,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::{math::Vector3, raytracer::image::Color};
+    use crate::{
+        math::Vector3,
+        raytracer::{
+            image::Color,
+            scene::materials::{LambertianMaterial, Material},
+        },
+    };
 
-    use super::{AreaLight, LightInfo, Material, Object, Plane, Scene};
+    use super::{AreaLight, LightInfo, Object, Plane, Scene};
 
     #[test]
     fn test_should_color() {
@@ -314,7 +247,7 @@ mod test {
         let plane = Plane {
             center: Vector3::new(5.0, 0.0, 2.5),
             normal: Vector3::new(0.0, 0.0, -1.0),
-            material: Material::default(),
+            material: Material::Lambertian(LambertianMaterial::new(Color::new(0.0, 0.0, 0.0), 0.5)),
         };
         let point = Vector3::new(0.0, 0.0, 0.0);
 

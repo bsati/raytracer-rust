@@ -49,28 +49,30 @@ impl Ray {
             return Color::new(0.0, 0.0, 0.0);
         }
 
-        let intersection = scene_config.scene.get_closest_interesection(self);
-        if let Some(intersection_info) = intersection {
-            let mut color = scene_config.scene.compute_phong_shading(
-                &intersection_info.point,
-                &intersection_info.normal,
-                &-self.direction,
-                &intersection_info.material,
-            );
+        Color::new(0.0, 0.0, 0.0)
 
-            if intersection_info.material.mirror > 0.0 {
-                let reflected_ray = Ray::new(
-                    intersection_info.point,
-                    self.direction.reflect(&intersection_info.normal),
-                );
-                color = color * (1.0 - intersection_info.material.mirror)
-                    + reflected_ray.trace(scene_config, current_depth + 1, max_depth)
-                        * intersection_info.material.mirror;
-            }
+        // let intersection = scene_config.scene.get_closest_interesection(self);
+        // if let Some(intersection_info) = intersection {
+        //     let mut color = scene_config.scene.compute_phong_shading(
+        //         &intersection_info.point,
+        //         &intersection_info.normal,
+        //         &-self.direction,
+        //         &intersection_info.material,
+        //     );
 
-            return color;
-        }
-        scene_config.image.background
+        //     if intersection_info.material.mirror > 0.0 {
+        //         let reflected_ray = Ray::new(
+        //             intersection_info.point,
+        //             self.direction.reflect(&intersection_info.normal),
+        //         );
+        //         color = color * (1.0 - intersection_info.material.mirror)
+        //             + reflected_ray.trace(scene_config, current_depth + 1, max_depth)
+        //                 * intersection_info.material.mirror;
+        //     }
+
+        //     return color;
+        // }
+        // scene_config.image.background
     }
 }
 

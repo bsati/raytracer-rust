@@ -1,11 +1,11 @@
 use crate::math::Vector3;
-use crate::raytracer::image::Color;
-use crate::raytracer::scene::Material;
 use serde::Deserialize;
 use std::{
     collections::HashMap, fmt::Debug, fs::File, io::BufRead, io::BufReader, iter::Peekable,
     str::FromStr,
 };
+
+use super::materials::Material;
 
 /// Loads an .obj file and returns a Vec containing all included meshes and their information
 /// needed for raytracing.
@@ -13,13 +13,12 @@ use std::{
 /// # Arguments
 ///
 /// * `file_path` Path to the .obj file. If a material library is used, the parent will be used to search for the .mtl file
-pub fn load_obj(file_path: &std::path::Path) -> Vec<Mesh> {
+pub fn load_obj(file_path: &std::path::Path, materials: &HashMap<String, Material>) -> Vec<Mesh> {
     let obj_file = File::open(file_path).unwrap();
     let reader = BufReader::new(obj_file);
 
     let mut result = Vec::new();
 
-    let mut materials: HashMap<String, Material> = HashMap::new();
     let mut index_helper = IndexHelper::new();
     let mut active_object_index = usize::MAX;
 
@@ -30,12 +29,6 @@ pub fn load_obj(file_path: &std::path::Path) -> Vec<Mesh> {
         let mut values = l.split_whitespace().peekable();
         let header = values.next();
         match header {
-            Some("mtllib") => {
-                load_material_lib(
-                    &file_path.parent().unwrap().join(values.next().unwrap()),
-                    &mut materials,
-                );
-            }
             Some("o") => {
                 let new_obj = Mesh::new();
                 material_index = usize::MAX;
@@ -47,7 +40,6 @@ pub fn load_obj(file_path: &std::path::Path) -> Vec<Mesh> {
                     active_object_index += 1;
                 }
             }
-            //Some("s") => {} ignored for now
             Some("v") => {
                 result[active_object_index]
                     .vertex_positions
@@ -214,60 +206,6 @@ fn get_tuple_index<'a, I: Iterator<Item = &'a str>>(
         idx2_arr[i] = idx2;
     }
     (idx1_arr, idx2_arr)
-}
-
-/// Loading function for a material library which adds all loaded materials by name to the given HashMap.
-///
-/// # Arguments
-///
-/// * `file_path` path of the material library (.mtl)
-/// * `material_map` mutable map to store the materials in
-fn load_material_lib(file_path: &std::path::Path, material_map: &mut HashMap<String, Material>) {
-    let mtl_file = File::open(file_path).unwrap();
-    let reader = BufReader::new(mtl_file);
-    let mut active_material = String::new();
-    for line in reader.lines() {
-        let l = line.unwrap();
-        let mut values = l.split_whitespace();
-        let header = values.next();
-        match header {
-            Some("newmtl") => {
-                active_material = values.next().unwrap().to_string();
-                material_map.insert(active_material.clone(), Material::default());
-            }
-            Some("Ka") => {
-                material_map
-                    .get_mut(&active_material)
-                    .unwrap()
-                    .ambient_color = Color::from(parse_vec(&mut values));
-            }
-            Some("Kd") => {
-                material_map
-                    .get_mut(&active_material)
-                    .unwrap()
-                    .diffuse_color = Color::from(parse_vec(&mut values));
-            }
-            Some("Ks") => {
-                material_map
-                    .get_mut(&active_material)
-                    .unwrap()
-                    .specular_color = Color::from(parse_vec(&mut values));
-            }
-            // Some("Ni") => {
-            //     material_map
-            //         .get_mut(&active_material)
-            //         .unwrap()
-            //         .optical_density = parse_next(&mut values);
-            // } ignored for now
-            Some("Ns") => {
-                material_map.get_mut(&active_material).unwrap().shininess = parse_next(&mut values);
-            }
-            // Some("d") => {
-            //     material_map.get_mut(&active_material).unwrap().dissolve = parse_next(&mut values);
-            // } ignored for now
-            _ => continue,
-        }
-    }
 }
 
 /// Utility function to parse a Vector3 from the given Iterator
