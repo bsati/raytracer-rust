@@ -136,7 +136,7 @@ impl Vector3 {
     /// * `n` Normal-vector to use for reflection
     #[inline]
     pub fn reflect(&self, n: &Vector3) -> Vector3 {
-        *self - *n * (2.0 * n.dot(self))
+        *self - *n * (2.0 * self.dot(n))
     }
 
     /// Returns a new Vector representing the minimum of both

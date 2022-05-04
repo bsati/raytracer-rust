@@ -36,13 +36,6 @@ impl Scatter for Material {
 #[derive(Clone, Debug, Deserialize)]
 pub struct LambertianMaterial {
     albedo: Color,
-    roughness: f64,
-}
-
-impl LambertianMaterial {
-    pub fn new(albedo: Color, roughness: f64) -> LambertianMaterial {
-        LambertianMaterial { albedo, roughness }
-    }
 }
 
 impl Scatter for LambertianMaterial {
@@ -67,6 +60,7 @@ pub struct EmissiveMaterial {
 }
 
 impl EmissiveMaterial {
+    #[cfg(test)]
     pub fn new(color: Color) -> EmissiveMaterial {
         EmissiveMaterial { color }
     }
@@ -105,20 +99,29 @@ impl DielectricsMaterial {
 
 impl Scatter for DielectricsMaterial {
     fn scatter(&self, ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
-        let attentuation = self.tint;
-        let refraction_ratio = 1.0 / self.refraction_index; // intersection.front_face ? 1.0 / ir : ir
-        let unit_direction = ray.direction.normalized();
+        let attentuation = Color::new(1.0, 1.0, 1.0);
+        let front_face = intersection.normal.dot(&ray.direction) <= 0.0;
+        let refraction_ratio = if front_face {
+            1.0 / self.refraction_index
+        } else {
+            self.refraction_index
+        };
+        let normal = if front_face {
+            intersection.normal
+        } else {
+            -intersection.normal
+        };
+        let unit_direction = ray.direction;
 
-        let cos_theta = f64::min((-unit_direction).dot(&intersection.normal), 1.0);
+        let cos_theta = f64::min((-unit_direction).dot(&normal), 1.0);
         let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
         let cannot_refract = refraction_ratio * sin_theta > 1.0;
 
         let mut rng = rand::thread_rng();
 
-        let mut direction = self.refract(&unit_direction, &intersection.normal, refraction_ratio);
-        if cannot_refract || self.reflectance(cos_theta, refraction_ratio) > rng.gen_range(0.0..1.0)
-        {
-            direction = unit_direction.reflect(&intersection.normal);
+        let mut direction = self.refract(&unit_direction, &normal, refraction_ratio);
+        if cannot_refract || self.reflectance(cos_theta, refraction_ratio) > rng.gen::<f64>() {
+            direction = unit_direction.reflect(&normal);
         }
 
         let scattered = Ray::new(intersection.point, direction);

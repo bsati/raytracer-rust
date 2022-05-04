@@ -115,6 +115,16 @@ impl Mul<f64> for Color {
     }
 }
 
+impl PartialEq<Color> for Color {
+    fn eq(&self, other: &Color) -> bool {
+        self.r == other.r && self.g == other.g && self.b == other.b
+    }
+
+    fn ne(&self, other: &Color) -> bool {
+        !(self == other)
+    }
+}
+
 #[inline]
 fn to_u8_buf(pixel_colors: Vec<Vec<Color>>) -> Box<[u8]> {
     let result: Vec<u8> = pixel_colors

@@ -31,12 +31,12 @@ scene:
         albedo: [0.8, 0.8, 0.8]
         fuzziness: 0.4
     - type: Sphere
-      center: [1, 0.6, 3.5]
+      center: [0, 0.7, 3]
       radius: 0.6
       material:
         type: Dieletrics
         tint: [1.0, 1.0, 1.0]
-        refraction_index: 0.1
+        refraction_index: 1.5
     - type: Sphere
       center: [3, 2, 1.5]
       radius: 2.0

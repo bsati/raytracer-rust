@@ -31,7 +31,7 @@ impl Ray {
     /// * `direction` Direction of the ray to determine it's movement in space
     pub fn new(origin: Vector3, direction: Vector3) -> Ray {
         Ray {
-            origin: origin,
+            origin,
             direction: direction.normalized(),
         }
     }
@@ -74,32 +74,26 @@ impl Ray {
                         let lights_len = scene_config.scene.lights.len() as f64;
                         if lights_len > 0.0
                             && rng.gen::<f64>() > (1.0 - lights_len * prob)
-                            && current_depth > (max_depth - 2)
+                            && current_depth == (max_depth - 1)
                         {
                             for l in &scene_config.scene.lights {
-                                let samples = l.sample_points.len() as f64;
-                                let mut single_light_color = Color::new(0.0, 0.0, 0.0);
-                                for sample_point in &l.sample_points {
-                                    if scene_config
-                                        .scene
-                                        .should_color(&intersection_info.point, &sample_point)
-                                    {
-                                        single_light_color += albedo * l.color;
-                                    }
-                                }
-                                single_light_color /= samples;
-                                light_color += single_light_color;
+                                let shadow_ray = Ray::new(
+                                    intersection_info.point,
+                                    l.sample_points[0] - intersection_info.point,
+                                );
+                                let target_color = shadow_ray.trace(scene_config, 0, 1);
+                                light_color += albedo * target_color
                             }
                             light_color /= lights_len;
                         }
-                        light_color + albedo * scattered_color
+                        light_color + (albedo * scattered_color)
                     }
                     None => albedo,
                 },
                 None => Color::new(0.0, 0.0, 0.0),
             };
         }
-        Color::new(0.0, 0.0, 0.0)
+        scene_config.image.background
     }
 }
 
