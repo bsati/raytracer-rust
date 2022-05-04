@@ -29,8 +29,8 @@ objects:
       albedo: [0.8, 0.8, 0.8]
       fuzziness: 0.4
   - type: Sphere
-    center: [0, 0.7, 3]
-    radius: 0.6
+    center: [1.0, 2.5, 4.0]
+    radius: 0.3
     material:
       type: Dieletrics
       tint: [1.0, 1.0, 1.0]
