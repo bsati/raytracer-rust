@@ -1,5 +1,6 @@
 use rand::Rng;
 
+/// Enum representing different SuperSampling techniques
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum SuperSampling {
@@ -18,13 +19,14 @@ impl SuperSampling {
     }
 }
 
+/// Error Type for Decoding a SuperSampling-Variant from a String
 pub struct SSAADecodeError {
     error: String,
 }
 
 impl SSAADecodeError {
     fn new(error: String) -> SSAADecodeError {
-        SSAADecodeError { error: error }
+        SSAADecodeError { error }
     }
 }
 
@@ -81,6 +83,13 @@ impl std::str::FromStr for SuperSampling {
     }
 }
 
+/// Returns a list of points supersampled from a grid by uniform distribution
+///
+/// # Arguments
+///
+/// * `resolution` Resolution of the grid to span for the pixel
+/// * `base_x` lower left x-coordinate of the grid
+/// * `base_y` lower left y-coordinate of the grid
 fn uniform_grid_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
     let step: f64 = 1.0 / resolution as f64;
     let mut samples = Vec::with_capacity((resolution * resolution) as usize);
@@ -92,6 +101,13 @@ fn uniform_grid_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f6
     samples
 }
 
+/// Returns a list of points supersampled from a grid by jittering.
+///
+/// # Arguments
+///
+/// * `resolution` Resolution of the grid to span for the pixel
+/// * `base_x` lower left x-coordinate of the grid
+/// * `base_y` lower left y-coordinate of the grid
 fn jitter_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
     let mut rng = rand::thread_rng();
     let step: f64 = 1.0 / resolution as f64;

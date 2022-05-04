@@ -119,16 +119,6 @@ impl Vector3 {
         self.clone()
     }
 
-    /// Constructs a new vector as a mirrored version of `self` along the normal `n`.
-    ///
-    /// # Arguments
-    ///
-    /// * `n` Normal acting as mirror axis
-    #[inline]
-    pub fn mirror(&self, n: &Vector3) -> Vector3 {
-        return *n * (2.0 * self.dot(n)) - *self;
-    }
-
     /// Reflects the vector for the normal `n`.
     ///
     /// # Arguments

@@ -25,15 +25,6 @@ impl Color {
         Color { r, g, b }
     }
 
-    /// Creates a new color with all values set to `0`.
-    pub fn default() -> Color {
-        Color {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-        }
-    }
-
     /// Clamps the color to a maximum of `1.0` to avoid over-saturation
     pub fn clamp(&mut self) {
         self.r = f64::min(self.r, 1.0);

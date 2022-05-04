@@ -99,7 +99,7 @@ impl DielectricsMaterial {
 
 impl Scatter for DielectricsMaterial {
     fn scatter(&self, ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
-        let attentuation = Color::new(1.0, 1.0, 1.0);
+        let attenuatin = self.tint;
         let front_face = intersection.normal.dot(&ray.direction) <= 0.0;
         let refraction_ratio = if front_face {
             1.0 / self.refraction_index
@@ -126,7 +126,7 @@ impl Scatter for DielectricsMaterial {
 
         let scattered = Ray::new(intersection.point, direction);
 
-        Some((Some(scattered), attentuation))
+        Some((Some(scattered), attenuatin))
     }
 }
 

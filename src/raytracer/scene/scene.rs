@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
-use rand::Rng;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
 
 use crate::{
     math::Vector3,
@@ -16,29 +13,11 @@ use super::{
 };
 
 #[derive(Deserialize)]
-pub struct SceneConfig {
-    pub image: ImageConfig,
+pub struct Scene {
     pub camera: CameraConfig,
-    pub scene: Scene,
-}
-
-#[derive(Deserialize)]
-pub struct ImageConfig {
     pub width: usize,
     pub height: usize,
     pub background: Color,
-}
-
-#[derive(Deserialize)]
-pub struct CameraConfig {
-    pub eye: Vector3,
-    pub look_at: Vector3,
-    pub up: Vector3,
-    pub fovy: f64,
-}
-
-#[derive(Deserialize)]
-pub struct Scene {
     #[serde(skip_deserializing)]
     pub lights: Vec<Light>,
     pub objects: Vec<Object>,
@@ -69,30 +48,6 @@ impl Scene {
         info
     }
 
-    /// Returns whether a given point is affected by the light at `light_pos` and should be colored with diffuse and specular lighting.
-    ///
-    /// Depends on whether the point is being shadowed by another object.
-    /// For a light `l` and point `p` the ray is constructed as `origin = p` and `direction = ||l.position - p||`.
-    /// If `p` is being shadowed there has to be an intersection `i` with object `o` where `||l.position - p|| > ||l.position - i.position||`
-    ///
-    /// # Arguments
-    ///
-    /// * `point` the point to check
-    /// * `light_pos` position of the light
-    #[inline]
-    pub fn should_color(&self, point: &Vector3, light_pos: &Vector3) -> bool {
-        let lp_vec = *light_pos - *point;
-        let ray = Ray::new(*point, lp_vec);
-        let shadow_intersection = self.get_closest_interesection(&ray);
-        match shadow_intersection {
-            Some(info) => {
-                let len = (info.point - *point).sqr_len();
-                len < 1e-4 || len > lp_vec.sqr_len()
-            }
-            None => true,
-        }
-    }
-
     pub fn precompute(&mut self) {
         for o in &mut self.objects {
             if let Object::Mesh(mesh) = o {
@@ -103,6 +58,14 @@ impl Scene {
             }
         }
     }
+}
+
+#[derive(Deserialize)]
+pub struct CameraConfig {
+    pub eye: Vector3,
+    pub look_at: Vector3,
+    pub up: Vector3,
+    pub fovy: f64,
 }
 
 #[derive(Deserialize, Clone)]
