@@ -1,3 +1,4 @@
+use rand::Rng;
 use serde::{Deserialize, Deserializer};
 use std::ops::{self, Index, IndexMut};
 
@@ -18,6 +19,42 @@ impl Vector3 {
     /// * `z` z value of the vector
     pub fn new(x: f64, y: f64, z: f64) -> Vector3 {
         Vector3 { data: [x, y, z] }
+    }
+
+    /// Creates a random vector with each coordinate in the given bounds.
+    ///
+    /// # Arguments
+    ///
+    /// * `min` minimum of the rng range
+    /// * `max` maximum of the rng range (inclusive)
+    pub fn random(min: f64, max: f64) -> Vector3 {
+        let mut rng = rand::thread_rng();
+        Vector3::new(
+            rng.gen_range(min..=max),
+            rng.gen_range(min..=max),
+            rng.gen_range(min..=max),
+        )
+    }
+
+    /// Creates a random vector in the unit sphere
+    pub fn random_in_unit_sphere() -> Vector3 {
+        loop {
+            let v = Vector3::random(-1.0, 1.0);
+            if v.sqr_len() < 1.0 {
+                return v;
+            }
+        }
+    }
+
+    /// Creates a random unit vector
+    pub fn random_unit_vector() -> Vector3 {
+        Vector3::random_in_unit_sphere().normalized()
+    }
+
+    /// Checks if the vector is near zero meaning all it's coordinates are close to being 0.0
+    pub fn near_zero(&self) -> bool {
+        let epsilon = 1e-8;
+        self[0].abs() < epsilon && self[1].abs() < epsilon && self[2].abs() < epsilon
     }
 
     /// Returns the x coordinate of the vector
@@ -83,16 +120,6 @@ impl Vector3 {
         self.clone()
     }
 
-    /// Constructs a new vector as a mirrored version of `self` along the normal `n`.
-    ///
-    /// # Arguments
-    ///
-    /// * `n` Normal acting as mirror axis
-    #[inline]
-    pub fn mirror(&self, n: &Vector3) -> Vector3 {
-        return *n * (2.0 * self.dot(n)) - *self;
-    }
-
     /// Reflects the vector for the normal `n`.
     ///
     /// # Arguments
@@ -100,7 +127,7 @@ impl Vector3 {
     /// * `n` Normal-vector to use for reflection
     #[inline]
     pub fn reflect(&self, n: &Vector3) -> Vector3 {
-        *self - *n * (2.0 * n.dot(self))
+        *self - *n * (2.0 * self.dot(n))
     }
 
     /// Returns a new Vector representing the minimum of both
@@ -298,5 +325,23 @@ mod test {
         assert_eq!(scale, Vector3::new(2.0, 2.0, 2.0), "wrong scale");
         assert_eq!(scale_s, v2, "wrong scale divide");
         assert_eq!(neg, Vector3::new(-1.0, -1.0, -1.0), "wrong negation");
+    }
+
+    #[test]
+    fn test_near_zero() {
+        let positive = Vector3::new(0.0000000000001, 0.0000000000001, 0.0000000000001);
+        let negative = Vector3::new(0.00001, 0.00001, 0.00001);
+
+        assert!(positive.near_zero());
+        assert!(!negative.near_zero());
+    }
+
+    #[test]
+    fn test_random_unit_vector() {
+        let vec = Vector3::random_unit_vector();
+
+        let len = vec.len();
+
+        assert!(len >= 9e-6 && len <= 1.0 + 1e-6);
     }
 }

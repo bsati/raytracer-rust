@@ -1,10 +1,11 @@
 use rand::Rng;
 
+/// Enum representing different SuperSampling techniques
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum SuperSampling {
-    Uniform(u8),
-    Jitter(u8),
+    Uniform(usize),
+    Jitter(usize),
 }
 
 impl SuperSampling {
@@ -18,13 +19,14 @@ impl SuperSampling {
     }
 }
 
+/// Error Type for Decoding a SuperSampling-Variant from a String
 pub struct SSAADecodeError {
     error: String,
 }
 
 impl SSAADecodeError {
     fn new(error: String) -> SSAADecodeError {
-        SSAADecodeError { error: error }
+        SSAADecodeError { error }
     }
 }
 
@@ -54,7 +56,7 @@ impl std::str::FromStr for SuperSampling {
                         "no arguments supplied, need resolution for jitter".to_string(),
                     ));
                 }
-                let resolution = method_args[1].parse::<u8>();
+                let resolution = method_args[1].parse::<usize>();
                 match resolution {
                     Ok(res) => Ok(SuperSampling::Jitter(res)),
                     Err(_) => Err(SSAADecodeError::new(
@@ -68,7 +70,7 @@ impl std::str::FromStr for SuperSampling {
                         "no arguments supplied, need resolution for uniform".to_string(),
                     ));
                 }
-                let resolution = method_args[1].parse::<u8>();
+                let resolution = method_args[1].parse::<usize>();
                 match resolution {
                     Ok(res) => Ok(SuperSampling::Jitter(res)),
                     Err(_) => Err(SSAADecodeError::new(
@@ -81,7 +83,14 @@ impl std::str::FromStr for SuperSampling {
     }
 }
 
-fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
+/// Returns a list of points supersampled from a grid by uniform distribution
+///
+/// # Arguments
+///
+/// * `resolution` Resolution of the grid to span for the pixel
+/// * `base_x` lower left x-coordinate of the grid
+/// * `base_y` lower left y-coordinate of the grid
+fn uniform_grid_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
     let step: f64 = 1.0 / resolution as f64;
     let mut samples = Vec::with_capacity((resolution * resolution) as usize);
     for i in 0..resolution {
@@ -92,10 +101,17 @@ fn uniform_grid_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, 
     samples
 }
 
-fn jitter_sampling(resolution: u8, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
+/// Returns a list of points supersampled from a grid by jittering.
+///
+/// # Arguments
+///
+/// * `resolution` Resolution of the grid to span for the pixel
+/// * `base_x` lower left x-coordinate of the grid
+/// * `base_y` lower left y-coordinate of the grid
+fn jitter_sampling(resolution: usize, base_x: f64, base_y: f64) -> Vec<(f64, f64)> {
     let mut rng = rand::thread_rng();
     let step: f64 = 1.0 / resolution as f64;
-    let mut samples = Vec::with_capacity((resolution * resolution) as usize);
+    let mut samples = Vec::with_capacity(resolution * resolution);
     for i in 0..resolution {
         for j in 0..resolution {
             samples.push((

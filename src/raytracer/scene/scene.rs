@@ -1,6 +1,5 @@
-use rand::Rng;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
 
 use crate::{
     math::Vector3,
@@ -9,35 +8,18 @@ use crate::{
 
 use super::{
     intersections::{Intersectable, IntersectionInfo},
+    materials::Material,
     mesh::{self, Mesh},
 };
 
 #[derive(Deserialize)]
-pub struct SceneConfig {
-    pub image: ImageConfig,
+pub struct Scene {
     pub camera: CameraConfig,
-    pub scene: Scene,
-}
-
-#[derive(Deserialize)]
-pub struct ImageConfig {
     pub width: usize,
     pub height: usize,
     pub background: Color,
-}
-
-#[derive(Deserialize)]
-pub struct CameraConfig {
-    pub eye: Vector3,
-    pub look_at: Vector3,
-    pub up: Vector3,
-    pub fovy: f64,
-}
-
-#[derive(Deserialize)]
-pub struct Scene {
-    pub ambient_light: Color,
-    lights: Vec<Light>,
+    #[serde(skip_deserializing)]
+    pub lights: Vec<Light>,
     pub objects: Vec<Object>,
 }
 
@@ -66,176 +48,89 @@ impl Scene {
         info
     }
 
-    /// Returns whether a given point is affected by the light at `light_pos` and should be colored with diffuse and specular lighting.
-    ///
-    /// Depends on whether the point is being shadowed by another object.
-    /// For a light `l` and point `p` the ray is constructed as `origin = p` and `direction = ||l.position - p||`.
-    /// If `p` is being shadowed there has to be an intersection `i` with object `o` where `||l.position - p|| > ||l.position - i.position||`
-    ///
-    /// # Arguments
-    ///
-    /// * `point` the point to check
-    /// * `light_pos` position of the light
-    #[inline]
-    fn should_color(&self, point: &Vector3, light_pos: &Vector3) -> bool {
-        let lp_vec = *light_pos - *point;
-        let ray = Ray::new(*point, lp_vec);
-        let shadow_intersection = self.get_closest_interesection(&ray);
-        match shadow_intersection {
-            Some(info) => {
-                let len = (info.point - *point).sqr_len();
-                len < 1e-4 || len > lp_vec.sqr_len()
-            }
-            None => true,
-        }
-    }
-
-    /// Computes the color of a point on an object from the given view via the Phong Lighting Model.
-    ///
-    /// # Arguments
-    ///
-    /// * `point` Point in space to calculate the color for
-    /// * `normal` Normal of the object intersection
-    /// * `view` Position where the point / object is being viewed from
-    /// * `material` Material of the hit object
-    pub fn compute_phong_shading(
-        &self,
-        point: &Vector3,
-        normal: &Vector3,
-        view: &Vector3,
-        material: &Material,
-    ) -> Color {
-        let mut c = material.ambient_color * self.ambient_light;
-
-        for l in &self.lights {
-            let indices: Vec<usize> = (0..l.samples.len())
-                .into_par_iter()
-                .filter(|idx| {
-                    let light_point = &l.samples[*idx];
-                    self.should_color(point, light_point)
-                })
-                .collect();
-            let intensity = indices.len() as f64 / l.samples.len() as f64;
-            let mut l_color = indices
-                .par_iter()
-                .map(|idx| {
-                    let l_vec = &l.samples[*idx];
-                    let mut light_color = Color::new(0.0, 0.0, 0.0);
-                    let lp_vec = *l_vec - *point;
-                    let lp_vec_normalized = lp_vec.normalized();
-                    let r = lp_vec_normalized.mirror(normal);
-                    let dot_l = normal.dot(&lp_vec_normalized);
-                    if dot_l >= 0.0 {
-                        light_color += l.color * intensity * (material.diffuse_color * dot_l);
-
-                        let dot_r = view.dot(&r);
-                        if dot_r >= 0.0 {
-                            let shininess = dot_r.powf(material.shininess);
-                            light_color +=
-                                material.specular_color * l.color * intensity * shininess;
-                        }
-                    }
-
-                    light_color
-                })
-                .reduce(|| Color::new(0.0, 0.0, 0.0), |a, b| a + b);
-            l_color /= l.samples.len() as f64;
-            c += l_color;
-        }
-
-        c
-    }
-
     pub fn precompute(&mut self) {
-        for l in &mut self.lights {
-            l.compute_samples();
-        }
-        for m in &mut self.objects {
-            if let Object::Mesh(mesh) = m {
+        for o in &mut self.objects {
+            if let Object::Mesh(mesh) = o {
                 mesh.compute_aabb();
             }
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct Light {
-    #[serde(skip_deserializing)]
-    samples: Vec<Vector3>,
-    color: Color,
-    light_info: LightInfo,
-}
-
-impl Light {
-    fn compute_samples(&mut self) {
-        self.samples = self.light_info.sample();
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum LightInfo {
-    Point(PointLight),
-    Area(AreaLight),
-}
-
-impl LightInfo {
-    fn sample(&self) -> Vec<Vector3> {
-        match self {
-            LightInfo::Point(pl) => vec![pl.position],
-            LightInfo::Area(area_light) => {
-                let resolution = area_light.grid_resolution;
-                let mut result = Vec::with_capacity(resolution * resolution);
-                let mut rng = rand::thread_rng();
-                let resolution_f = resolution as f64;
-                let u_step = area_light.u / resolution_f;
-                let v_step = area_light.v / resolution_f;
-                for i in 0..resolution {
-                    for j in 0..resolution {
-                        let i_f = i as f64;
-                        let j_f = j as f64;
-                        if area_light.deterministic {
-                            result.push(
-                                area_light.corner + u_step * (i_f + 0.5) + v_step * (j_f + 0.5),
-                            );
-                        } else {
-                            result.push(
-                                area_light.corner
-                                    + u_step * (i_f + rng.gen_range(0.0..1.0))
-                                    + v_step * (j_f + rng.gen_range(0.0..1.0)),
-                            )
-                        }
-                    }
-                }
-                result
+            if o.is_light() {
+                self.lights.push(Light::from(&*o));
             }
         }
     }
 }
 
 #[derive(Deserialize)]
-struct PointLight {
-    position: Vector3,
+pub struct CameraConfig {
+    pub eye: Vector3,
+    pub look_at: Vector3,
+    pub up: Vector3,
+    pub fovy: f64,
 }
 
-#[derive(Deserialize)]
-struct AreaLight {
-    corner: Vector3,
-    u: Vector3,
-    v: Vector3,
-    grid_resolution: usize,
-    deterministic: bool,
-}
-
-#[derive(Deserialize)]
-struct SphereLight {}
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
     Mesh(Mesh),
+}
+
+impl Object {
+    fn is_light(&self) -> bool {
+        match self {
+            Object::Sphere(sphere) => match sphere.material {
+                Material::Emissive(_) => true,
+                _ => false,
+            },
+            Object::Plane(plane) => match plane.material {
+                Material::Emissive(_) => true,
+                _ => false,
+            },
+            Object::Mesh(mesh) => {
+                for material in &mesh.materials {
+                    if let Material::Emissive(_) = material {
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+    }
+}
+
+pub struct Light {
+    pub sample_points: Vec<Vector3>,
+}
+
+impl Light {
+    fn new(sample_points: Vec<Vector3>) -> Light {
+        Light { sample_points }
+    }
+}
+
+impl From<&Object> for Light {
+    fn from(o: &Object) -> Self {
+        match o {
+            Object::Plane(p) => Light::new(vec![p.center]),
+            Object::Sphere(s) => Light::new(vec![s.center]),
+            Object::Mesh(m) => {
+                let mut color = Color::new(0.0, 0.0, 0.0);
+                let mut sample_positions = Vec::new();
+                for triangle in &m.triangles {
+                    if let Material::Emissive(e) = &m.materials[triangle.material_idx] {
+                        color += e.color;
+                        let interpolated = (m.vertex_positions[triangle.vertex_idx[0]]
+                            + m.vertex_positions[triangle.vertex_idx[1]]
+                            + m.vertex_positions[triangle.vertex_idx[2]])
+                            / 3.0;
+                        sample_positions.push(interpolated);
+                    }
+                }
+                Light::new(sample_positions)
+            }
+        }
+    }
 }
 
 impl Intersectable for Object {
@@ -255,82 +150,136 @@ impl<'de> Deserialize<'de> for Mesh {
     {
         let val: serde_yaml::Value = serde_yaml::Value::deserialize(deserializer).unwrap();
         let path = std::path::Path::new(val.get("path").unwrap().as_str().unwrap());
-        let meshes = mesh::load_obj(path);
+        let materials = val.get("materials").unwrap();
+
+        let materials: HashMap<String, Material> =
+            serde_yaml::from_value(materials.clone()).unwrap();
+        let meshes = mesh::load_obj(path, &materials);
         Ok(meshes[0].to_owned())
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Sphere {
     pub center: Vector3,
     pub radius: f64,
     pub material: Material,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Plane {
     pub center: Vector3,
     pub normal: Vector3,
     pub material: Material,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug)]
-pub struct Material {
-    pub ambient_color: Color,
-    pub diffuse_color: Color,
-    pub specular_color: Color,
-    pub shininess: f64,
-    pub mirror: f64,
-}
-
-impl Material {
-    pub fn default() -> Material {
-        Material {
-            ambient_color: Color::default(),
-            diffuse_color: Color::default(),
-            specular_color: Color::default(),
-            shininess: -1.0,
-            mirror: 0.0,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::{math::Vector3, raytracer::image::Color};
+    use crate::{
+        math::Vector3,
+        raytracer::{
+            image::Color,
+            raytrace::Ray,
+            scene::{
+                materials::{EmissiveMaterial, LambertianMaterial, Material},
+                mesh::{Mesh, Triangle},
+                Object,
+            },
+        },
+    };
 
-    use super::{AreaLight, LightInfo, Material, Object, Plane, Scene};
+    use super::{Light, Plane, Scene, Sphere};
 
     #[test]
-    fn test_should_color() {
-        let light_source = AreaLight {
-            corner: Vector3::new(5.0, 0.0, 0.0),
-            u: Vector3::new(0.0, 0.0, 5.0),
-            v: Vector3::new(0.0, 5.0, 0.0),
-            grid_resolution: 2,
-            deterministic: true,
-        };
-        let samples = LightInfo::Area(light_source).sample();
-        let plane = Plane {
-            center: Vector3::new(5.0, 0.0, 2.5),
-            normal: Vector3::new(0.0, 0.0, -1.0),
-            material: Material::default(),
-        };
-        let point = Vector3::new(0.0, 0.0, 0.0);
-
-        let scene = Scene {
-            ambient_light: Color::default(),
+    fn test_closest_intersection() {
+        let mut scene = Scene {
+            background: Color::new(0.0, 0.0, 0.0),
+            camera: super::CameraConfig {
+                eye: Vector3::new(0.0, 0.0, 0.0),
+                look_at: Vector3::new(0.0, 0.0, 0.0),
+                up: Vector3::new(0.0, 0.0, 0.0),
+                fovy: 0.0,
+            },
+            height: 10,
+            width: 10,
             lights: Vec::new(),
-            objects: vec![Object::Plane(plane)],
+            objects: Vec::new(),
         };
+        let material = Material::Emissive(EmissiveMaterial::new(Color::new(0.0, 0.0, 0.0)));
+        let sphere1 = Object::Sphere(Sphere {
+            center: Vector3::new(5.0, 0.0, 0.0),
+            radius: 1.0,
+            material: material.clone(),
+        });
+        scene.objects.push(sphere1);
+        let sphere2 = Object::Sphere(Sphere {
+            center: Vector3::new(5.0, 0.0, 0.0),
+            radius: 1.5,
+            material: material.clone(),
+        });
+        scene.objects.push(sphere2);
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
 
-        let mut negative_count = 0;
-        for s in samples {
-            if !scene.should_color(&point, &s) {
-                negative_count += 1;
-            }
+        let intersection = scene.get_closest_interesection(&ray);
+
+        assert!(intersection.is_some());
+        if let Some(intersection) = intersection {
+            assert_eq!(intersection.t, 3.5);
         }
+    }
 
-        assert_eq!(negative_count, 2);
+    fn create_test_objects(material: &Material) -> (Object, Object, Object) {
+        let sphere = Object::Sphere(Sphere {
+            center: Vector3::new(0.0, 0.0, 0.0),
+            radius: 0.0,
+            material: material.clone(),
+        });
+        let plane = Object::Plane(Plane {
+            center: Vector3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            material: material.clone(),
+        });
+        let mut mesh = Mesh::new();
+        mesh.vertex_positions.push(Vector3::new(3.0, 0.0, 0.0));
+        mesh.vertex_positions.push(Vector3::new(0.0, 3.0, 0.0));
+        mesh.vertex_positions.push(Vector3::new(0.0, 0.0, 3.0));
+        mesh.materials.push(material.clone());
+        let triangle = Triangle::new([0, 1, 2], 0);
+        mesh.triangles.push(triangle);
+        let mesh = Object::Mesh(mesh);
+        (sphere, plane, mesh)
+    }
+
+    #[test]
+    fn test_is_lights() {
+        let material = Material::Emissive(EmissiveMaterial::new(Color::new(0.0, 0.0, 0.0)));
+        let material_neg = Material::Lambertian(LambertianMaterial::new(Color::new(0.0, 0.0, 0.0)));
+
+        let (sphere, plane, mesh) = create_test_objects(&material);
+        let (sphere_neg, plane_neg, mesh_neg) = create_test_objects(&material_neg);
+
+        assert!(sphere.is_light());
+        assert!(plane.is_light());
+        assert!(mesh.is_light());
+        assert!(!sphere_neg.is_light());
+        assert!(!plane_neg.is_light());
+        assert!(!mesh_neg.is_light());
+    }
+
+    #[test]
+    fn test_light_from_object() {
+        let material = Material::Emissive(EmissiveMaterial::new(Color::new(0.0, 0.0, 0.0)));
+        let (sphere, plane, mesh) = create_test_objects(&material);
+
+        let sphere = Light::from(&sphere);
+        let plane = Light::from(&plane);
+        let mesh = Light::from(&mesh);
+
+        assert_eq!(sphere.sample_points.len(), 1);
+        assert_eq!(sphere.sample_points[0], Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(plane.sample_points.len(), 1);
+        assert_eq!(plane.sample_points[0], Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(mesh.sample_points.len(), 1);
+        assert_eq!(mesh.sample_points[0], Vector3::new(1.0, 1.0, 1.0));
     }
 }
