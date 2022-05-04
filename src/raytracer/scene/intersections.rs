@@ -23,7 +23,7 @@ pub struct IntersectionInfo<'mat> {
 }
 
 impl IntersectionInfo<'_> {
-    fn new(point: Vector3, normal: Vector3, material: &Material, t: f64) -> IntersectionInfo {
+    pub fn new(point: Vector3, normal: Vector3, material: &Material, t: f64) -> IntersectionInfo {
         IntersectionInfo {
             point,
             normal,

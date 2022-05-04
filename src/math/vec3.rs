@@ -51,9 +51,10 @@ impl Vector3 {
         Vector3::random_in_unit_sphere().normalized()
     }
 
+    /// Checks if the vector is near zero meaning all it's coordinates are close to being 0.0
     pub fn near_zero(&self) -> bool {
         let epsilon = 1e-8;
-        f64::abs(self[0]) < epsilon && f64::abs(self[1]) < epsilon && f64::abs(self[2]) < epsilon
+        self[0].abs() < epsilon && self[1].abs() < epsilon && self[2].abs() < epsilon
     }
 
     /// Returns the x coordinate of the vector
@@ -324,5 +325,23 @@ mod test {
         assert_eq!(scale, Vector3::new(2.0, 2.0, 2.0), "wrong scale");
         assert_eq!(scale_s, v2, "wrong scale divide");
         assert_eq!(neg, Vector3::new(-1.0, -1.0, -1.0), "wrong negation");
+    }
+
+    #[test]
+    fn test_near_zero() {
+        let positive = Vector3::new(0.0000000000001, 0.0000000000001, 0.0000000000001);
+        let negative = Vector3::new(0.00001, 0.00001, 0.00001);
+
+        assert!(positive.near_zero());
+        assert!(!negative.near_zero());
+    }
+
+    #[test]
+    fn test_random_unit_vector() {
+        let vec = Vector3::random_unit_vector();
+
+        let len = vec.len();
+
+        assert!(len >= 9e-6 && len <= 1.0 + 1e-6);
     }
 }

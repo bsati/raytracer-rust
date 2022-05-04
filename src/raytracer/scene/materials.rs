@@ -8,6 +8,9 @@ use crate::{
 
 use super::intersections::IntersectionInfo;
 
+/// Trait for all Materials to provide Scattering for raytracing.
+/// Implementing materials can either return a new so called scattered ray that bounces from the intersection point
+/// and / or a color value for the intersection point.
 pub trait Scatter {
     fn scatter(&self, ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)>;
 }
@@ -38,6 +41,13 @@ pub struct LambertianMaterial {
     albedo: Color,
 }
 
+impl LambertianMaterial {
+    #[cfg(test)]
+    fn new(albedo: Color) -> LambertianMaterial {
+        LambertianMaterial { albedo }
+    }
+}
+
 impl Scatter for LambertianMaterial {
     fn scatter(&self, _ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
         let mut scatter_direction = intersection.normal + Vector3::random_unit_vector();
@@ -48,9 +58,9 @@ impl Scatter for LambertianMaterial {
 
         let scattered = Ray::new(intersection.point, scatter_direction);
 
-        let attentuation = self.albedo;
+        let attenuation = self.albedo;
 
-        Some((Some(scattered), attentuation))
+        Some((Some(scattered), attenuation))
     }
 }
 
@@ -83,17 +93,25 @@ pub struct DielectricsMaterial {
 }
 
 impl DielectricsMaterial {
-    fn refract(&self, direction: &Vector3, normal: &Vector3, refraction_ratio: f64) -> Vector3 {
-        let cos_theta = f64::min(normal.dot(&-*direction), 1.0);
+    #[cfg(test)]
+    fn new(tint: Color, refraction_index: f64) -> DielectricsMaterial {
+        DielectricsMaterial {
+            tint,
+            refraction_index,
+        }
+    }
+
+    fn refract(direction: &Vector3, normal: &Vector3, refraction_ratio: f64) -> Vector3 {
+        let cos_theta = normal.dot(&-*direction).min(1.0);
         let r_out_perp = (*direction + *normal * cos_theta) * refraction_ratio;
-        let r_out_parallel = *normal * -f64::sqrt(f64::abs(1.0 - r_out_perp.sqr_len()));
-        return r_out_perp + r_out_parallel;
+        let r_out_parallel = *normal * -(1.0 - r_out_perp.sqr_len()).abs().sqrt();
+        r_out_perp + r_out_parallel
     }
 
     #[inline]
-    fn reflectance(&self, cosine: f64, ref_idx: f64) -> f64 {
-        let r0 = f64::powf((1.0 - ref_idx) / (1.0 + ref_idx), 2.0);
-        r0 + (1.0 - r0) * f64::powf(1.0 - cosine, 5.0)
+    fn reflectance(cosine: f64, ref_idx: f64) -> f64 {
+        let r0 = ((1.0 - ref_idx) / (1.0 + ref_idx)).powi(2);
+        r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
     }
 }
 
@@ -119,8 +137,11 @@ impl Scatter for DielectricsMaterial {
 
         let mut rng = rand::thread_rng();
 
-        let mut direction = self.refract(&unit_direction, &normal, refraction_ratio);
-        if cannot_refract || self.reflectance(cos_theta, refraction_ratio) > rng.gen::<f64>() {
+        let mut direction =
+            DielectricsMaterial::refract(&unit_direction, &normal, refraction_ratio);
+        if cannot_refract
+            || DielectricsMaterial::reflectance(cos_theta, refraction_ratio) > rng.gen::<f64>()
+        {
             direction = unit_direction.reflect(&normal);
         }
 
@@ -136,6 +157,13 @@ pub struct MetalMaterial {
     fuzziness: f64,
 }
 
+impl MetalMaterial {
+    #[cfg(test)]
+    fn new(albedo: Color, fuzziness: f64) -> MetalMaterial {
+        MetalMaterial { albedo, fuzziness }
+    }
+}
+
 impl Scatter for MetalMaterial {
     fn scatter(&self, ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
         let reflected = ray.direction.normalized().reflect(&intersection.normal);
@@ -143,12 +171,131 @@ impl Scatter for MetalMaterial {
             intersection.point,
             reflected + Vector3::random_in_unit_sphere() * self.fuzziness,
         );
-        let attentuation = self.albedo;
+        let attenuation = self.albedo;
 
         if scattered.direction.dot(&intersection.normal) > 0.0 {
-            return Some((Some(scattered), attentuation));
+            return Some((Some(scattered), attenuation));
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        math::Vector3,
+        raytracer::{
+            image::Color,
+            raytrace::Ray,
+            scene::{
+                intersections::IntersectionInfo,
+                materials::{LambertianMaterial, MetalMaterial},
+            },
+        },
+    };
+
+    use super::{DielectricsMaterial, EmissiveMaterial, Material, Scatter};
+
+    #[test]
+    fn test_refract() {
+        let v = Vector3::new(1.0, 0.0, 0.0);
+        let n = Vector3::new(0.0, 1.0, 0.0);
+        let idx = 1.0;
+
+        let refracted = DielectricsMaterial::refract(&v, &n, idx);
+
+        assert_eq!(refracted, v);
+    }
+
+    #[test]
+    fn test_reflectance() {
+        let reflectance = DielectricsMaterial::reflectance(0.0, 1.0);
+
+        assert_eq!(reflectance, 1.0);
+    }
+
+    #[test]
+    fn test_emissive_scatter() {
+        let material = EmissiveMaterial::new(Color::new(1.0, 0.5, 0.0));
+        let mat_wrapper = Material::Emissive(material.clone());
+
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0));
+        let intersection = IntersectionInfo::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            &mat_wrapper,
+            0.0,
+        );
+
+        let result = material.scatter(&ray, &intersection);
+        assert!(result.is_some());
+        if let Some((r, c)) = result {
+            assert!(r.is_none());
+            assert_eq!(c, Color::new(1.0, 0.5, 0.0));
+        }
+    }
+
+    #[test]
+    fn test_lambertian_scatter() {
+        let material = LambertianMaterial::new(Color::new(1.0, 0.5, 0.0));
+        let mat_wrapper = Material::Lambertian(material.clone());
+
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0));
+        let intersection = IntersectionInfo::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            &mat_wrapper,
+            0.0,
+        );
+
+        let result = material.scatter(&ray, &intersection);
+        assert!(result.is_some());
+        if let Some((r, c)) = result {
+            assert!(r.is_some());
+            assert_eq!(c, Color::new(1.0, 0.5, 0.0));
+        }
+    }
+
+    #[test]
+    fn test_metal_scatter() {
+        let material = MetalMaterial::new(Color::new(1.0, 0.5, 0.0), 0.5);
+        let mat_wrapper = Material::Metal(material.clone());
+
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0));
+        let intersection = IntersectionInfo::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            &mat_wrapper,
+            0.0,
+        );
+
+        let result = material.scatter(&ray, &intersection);
+        assert!(result.is_some());
+        if let Some((r, c)) = result {
+            assert!(r.is_some());
+            assert_eq!(c, Color::new(1.0, 0.5, 0.0));
+        }
+    }
+
+    #[test]
+    fn test_dieletrics_scatter() {
+        let material = DielectricsMaterial::new(Color::new(1.0, 0.5, 0.0), 0.5);
+        let mat_wrapper = Material::Dieletrics(material.clone());
+
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0));
+        let intersection = IntersectionInfo::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            &mat_wrapper,
+            0.0,
+        );
+
+        let result = material.scatter(&ray, &intersection);
+        assert!(result.is_some());
+        if let Some((r, c)) = result {
+            assert!(r.is_some());
+            assert_eq!(c, Color::new(1.0, 0.5, 0.0));
+        }
     }
 }
