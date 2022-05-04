@@ -100,46 +100,34 @@ impl Object {
 }
 
 pub struct Light {
-    pub color: Color,
     pub sample_points: Vec<Vector3>,
 }
 
 impl Light {
-    fn new(color: Color, sample_points: Vec<Vector3>) -> Light {
-        Light {
-            color,
-            sample_points,
-        }
+    fn new(sample_points: Vec<Vector3>) -> Light {
+        Light { sample_points }
     }
 }
 
 impl From<&Object> for Light {
     fn from(o: &Object) -> Self {
         match o {
-            Object::Plane(p) => match &p.material {
-                Material::Emissive(e) => Light::new(e.color, vec![p.center]),
-                _ => Light::new(Color::new(1.0, 1.0, 1.0), vec![p.center]),
-            },
-            Object::Sphere(s) => match &s.material {
-                Material::Emissive(e) => {
-                    let mut sample1 = s.center.clone();
-                    sample1[0] += s.radius;
-                    let mut sample2 = s.center.clone();
-                    sample2[0] -= s.radius;
-                    Light::new(e.color, vec![s.center, sample1, sample2])
-                }
-                _ => Light::new(Color::new(1.0, 1.0, 1.0), vec![s.center]),
-            },
+            Object::Plane(p) => Light::new(vec![p.center]),
+            Object::Sphere(s) => Light::new(vec![s.center]),
             Object::Mesh(m) => {
                 let mut color = Color::new(0.0, 0.0, 0.0);
                 let mut sample_positions = Vec::new();
                 for triangle in &m.triangles {
                     if let Material::Emissive(e) = &m.materials[triangle.material_idx] {
                         color += e.color;
-                        sample_positions.push(m.vertex_positions[triangle.vertex_idx[0]]);
+                        let interpolated = (m.vertex_positions[triangle.vertex_idx[0]]
+                            + m.vertex_positions[triangle.vertex_idx[1]]
+                            + m.vertex_positions[triangle.vertex_idx[2]])
+                            / 3.0;
+                        sample_positions.push(interpolated);
                     }
                 }
-                Light::new(color, sample_positions)
+                Light::new(sample_positions)
             }
         }
     }
@@ -191,42 +179,107 @@ mod test {
         math::Vector3,
         raytracer::{
             image::Color,
-            scene::materials::{LambertianMaterial, Material},
+            raytrace::Ray,
+            scene::{
+                materials::{EmissiveMaterial, LambertianMaterial, Material},
+                mesh::{Mesh, Triangle},
+                Object,
+            },
         },
     };
 
-    use super::{Object, Plane, Scene};
+    use super::{Light, Plane, Scene, Sphere};
 
     #[test]
-    fn test_should_color() {
-        // let light_source = AreaLight {
-        //     corner: Vector3::new(5.0, 0.0, 0.0),
-        //     u: Vector3::new(0.0, 0.0, 5.0),
-        //     v: Vector3::new(0.0, 5.0, 0.0),
-        //     grid_resolution: 2,
-        //     deterministic: true,
-        // };
-        // let samples = LightInfo::Area(light_source).sample();
-        // let plane = Plane {
-        //     center: Vector3::new(5.0, 0.0, 2.5),
-        //     normal: Vector3::new(0.0, 0.0, -1.0),
-        //     material: Material::Lambertian(LambertianMaterial::new(Color::new(0.0, 0.0, 0.0), 0.5)),
-        // };
-        // let point = Vector3::new(0.0, 0.0, 0.0);
+    fn test_closest_intersection() {
+        let mut scene = Scene {
+            background: Color::new(0.0, 0.0, 0.0),
+            camera: super::CameraConfig {
+                eye: Vector3::new(0.0, 0.0, 0.0),
+                look_at: Vector3::new(0.0, 0.0, 0.0),
+                up: Vector3::new(0.0, 0.0, 0.0),
+                fovy: 0.0,
+            },
+            height: 10,
+            width: 10,
+            lights: Vec::new(),
+            objects: Vec::new(),
+        };
+        let material = Material::Emissive(EmissiveMaterial::new(Color::new(0.0, 0.0, 0.0)));
+        let sphere1 = Object::Sphere(Sphere {
+            center: Vector3::new(5.0, 0.0, 0.0),
+            radius: 1.0,
+            material: material.clone(),
+        });
+        scene.objects.push(sphere1);
+        let sphere2 = Object::Sphere(Sphere {
+            center: Vector3::new(5.0, 0.0, 0.0),
+            radius: 1.5,
+            material: material.clone(),
+        });
+        scene.objects.push(sphere2);
+        let ray = Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
 
-        // let scene = Scene {
-        //     ambient_light: Color::default(),
-        //     lights: Vec::new(),
-        //     objects: vec![Object::Plane(plane)],
-        // };
+        let intersection = scene.get_closest_interesection(&ray);
 
-        // let mut negative_count = 0;
-        // for s in samples {
-        //     if !scene.should_color(&point, &s) {
-        //         negative_count += 1;
-        //     }
-        // }
+        assert!(intersection.is_some());
+        if let Some(intersection) = intersection {
+            assert_eq!(intersection.t, 3.5);
+        }
+    }
 
-        // assert_eq!(negative_count, 2);
+    fn create_test_objects(material: &Material) -> (Object, Object, Object) {
+        let sphere = Object::Sphere(Sphere {
+            center: Vector3::new(0.0, 0.0, 0.0),
+            radius: 0.0,
+            material: material.clone(),
+        });
+        let plane = Object::Plane(Plane {
+            center: Vector3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            material: material.clone(),
+        });
+        let mut mesh = Mesh::new();
+        mesh.vertex_positions.push(Vector3::new(3.0, 0.0, 0.0));
+        mesh.vertex_positions.push(Vector3::new(0.0, 3.0, 0.0));
+        mesh.vertex_positions.push(Vector3::new(0.0, 0.0, 3.0));
+        mesh.materials.push(material.clone());
+        let triangle = Triangle::new([0, 1, 2], 0);
+        mesh.triangles.push(triangle);
+        let mesh = Object::Mesh(mesh);
+        (sphere, plane, mesh)
+    }
+
+    #[test]
+    fn test_is_lights() {
+        let material = Material::Emissive(EmissiveMaterial::new(Color::new(0.0, 0.0, 0.0)));
+        let material_neg = Material::Lambertian(LambertianMaterial::new(Color::new(0.0, 0.0, 0.0)));
+
+        let (sphere, plane, mesh) = create_test_objects(&material);
+        let (sphere_neg, plane_neg, mesh_neg) = create_test_objects(&material_neg);
+
+        assert!(sphere.is_light());
+        assert!(plane.is_light());
+        assert!(mesh.is_light());
+        assert!(!sphere_neg.is_light());
+        assert!(!plane_neg.is_light());
+        assert!(!mesh_neg.is_light());
+    }
+
+    #[test]
+    fn test_light_from_object() {
+        let material = Material::Emissive(EmissiveMaterial::new(Color::new(0.0, 0.0, 0.0)));
+        let (sphere, plane, mesh) = create_test_objects(&material);
+
+        let sphere = Light::from(&sphere);
+        let plane = Light::from(&plane);
+        let mesh = Light::from(&mesh);
+
+        assert_eq!(sphere.sample_points.len(), 1);
+        assert_eq!(sphere.sample_points[0], Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(plane.sample_points.len(), 1);
+        assert_eq!(plane.sample_points[0], Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(mesh.sample_points.len(), 1);
+        assert_eq!(mesh.sample_points[0], Vector3::new(1.0, 1.0, 1.0));
     }
 }

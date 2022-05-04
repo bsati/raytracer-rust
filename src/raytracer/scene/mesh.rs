@@ -12,7 +12,13 @@ use super::materials::Material;
 ///
 /// # Arguments
 ///
-/// * `file_path` Path to the .obj file. If a material library is used, the parent will be used to search for the .mtl file
+/// * `file_path` Path to the .obj file
+/// * `materials` Map containing materials by name listed below the mesh (replacing the materials usually stored in a .mtl file)
+///
+/// # Panics
+///
+/// If the object file can not be read, materials listed in the .obj file are not in the given map or the object has non-triangulated faces
+/// the function will panic.
 pub fn load_obj(file_path: &std::path::Path, materials: &HashMap<String, Material>) -> Vec<Mesh> {
     let obj_file = File::open(file_path).unwrap();
     let reader = BufReader::new(obj_file);

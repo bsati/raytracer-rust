@@ -43,7 +43,7 @@ pub struct LambertianMaterial {
 
 impl LambertianMaterial {
     #[cfg(test)]
-    fn new(albedo: Color) -> LambertianMaterial {
+    pub fn new(albedo: Color) -> LambertianMaterial {
         LambertianMaterial { albedo }
     }
 }
@@ -271,7 +271,14 @@ mod test {
         );
 
         let result = material.scatter(&ray, &intersection);
-        assert!(result.is_some());
+        assert!(result.is_none());
+        let intersection = IntersectionInfo::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            &mat_wrapper,
+            0.0,
+        );
+        let result = material.scatter(&ray, &&intersection);
         if let Some((r, c)) = result {
             assert!(r.is_some());
             assert_eq!(c, Color::new(1.0, 0.5, 0.0));
