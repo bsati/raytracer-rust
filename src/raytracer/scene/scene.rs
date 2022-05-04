@@ -1,9 +1,12 @@
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use crate::{
     math::Vector3,
-    raytracer::{image::Color, raytrace::Ray},
+    raytracer::{
+        image::{self, Color},
+        raytrace::Ray,
+    },
 };
 
 use super::{
@@ -52,6 +55,15 @@ impl Scene {
         for o in &mut self.objects {
             if let Object::Mesh(mesh) = o {
                 mesh.compute_aabb();
+                for mat in &mut mesh.materials {
+                    if let Material::Texture(tm) = mat {
+                        let (pixels, width, height) =
+                            image::read_image(Path::new(&tm.texture_path));
+                        tm.pixel_colors = pixels;
+                        tm.width = width as f64;
+                        tm.height = height as f64;
+                    }
+                }
             }
             if o.is_light() {
                 self.lights.push(Light::from(&*o));

@@ -41,6 +41,14 @@ impl Color {
             (255.999 * self.b) as u8,
         ]
     }
+
+    pub fn from_output(bytes: [u8; 3]) -> Color {
+        Color::new(
+            bytes[0] as f64 / 255.999,
+            bytes[1] as f64 / 255.999,
+            bytes[2] as f64 / 255.999,
+        )
+    }
 }
 
 impl<'de> Deserialize<'de> for Color {
@@ -134,6 +142,10 @@ fn to_u8_buf(pixel_colors: Vec<Vec<Color>>) -> Box<[u8]> {
 /// * `width` width of the image
 /// * `height` height of the image
 /// * `output_path` Path specifying the output file to write to (will be created if it doesn't exist and overriden if it exists)
+///
+/// # Panics
+///
+/// If the file cannot be written to.
 pub fn write_image(
     pixel_colors: Vec<Vec<Color>>,
     width: usize,
@@ -148,4 +160,25 @@ pub fn write_image(
     encoder.set_color(png::ColorType::Rgb);
     let mut writer = encoder.write_header().unwrap();
     writer.write_image_data(&*to_u8_buf(pixel_colors)).unwrap();
+}
+
+/// Reads and Image
+pub fn read_image(file_path: &std::path::Path) -> (Vec<Color>, usize, usize) {
+    let file = fs::File::open(file_path).unwrap();
+    let decoder = png::Decoder::new(file);
+    let mut reader = decoder.read_info().unwrap();
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).unwrap();
+    let bytes = &buf[..info.buffer_size()];
+    let len = info.buffer_size() / 3;
+    let mut result = Vec::with_capacity(len);
+    for i in 0..len {
+        let idx = i * 3;
+        result.push(Color::from_output([
+            bytes[idx],
+            bytes[idx + 1],
+            bytes[idx + 2],
+        ]));
+    }
+    (result, info.width as usize, info.height as usize)
 }

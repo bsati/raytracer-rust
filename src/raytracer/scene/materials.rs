@@ -21,7 +21,7 @@ pub enum Material {
     Lambertian(LambertianMaterial),
     Metal(MetalMaterial),
     Dieletrics(DielectricsMaterial),
-    //Texture,
+    Texture(TextureMaterial),
     Emissive(EmissiveMaterial),
 }
 
@@ -32,6 +32,7 @@ impl Scatter for Material {
             Material::Metal(m) => m.scatter(ray, intersection),
             Material::Dieletrics(d) => d.scatter(ray, intersection),
             Material::Emissive(l) => l.scatter(ray, intersection),
+            Material::Texture(t) => t.scatter(ray, intersection),
         }
     }
 }
@@ -178,6 +179,74 @@ impl Scatter for MetalMaterial {
         }
 
         None
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TextureMaterial {
+    pub texture_path: String,
+    #[serde(skip_deserializing)]
+    pub pixel_colors: Vec<Color>,
+    #[serde(skip_deserializing)]
+    pub width: f64,
+    #[serde(skip_deserializing)]
+    pub height: f64,
+}
+
+impl TextureMaterial {
+    fn get_albedo(&self, u: f64, v: f64) -> Color {
+        let x = self.width * u;
+        let y = self.height * v;
+        if x % 1.0 != 0.0 || y % 1.0 != 0.0 {
+            let x_top = x.ceil() as usize;
+            let y_top = y.ceil() as usize;
+            let x_bot = x.floor() as usize;
+            let y_bot = y.floor() as usize;
+
+            let c00 = self.get_pixel_color(x_bot, y_bot);
+            let c01 = self.get_pixel_color(x_bot, y_top);
+            let c10 = self.get_pixel_color(x_top, y_bot);
+            let c11 = self.get_pixel_color(x_top, y_top);
+
+            let x = x - x.floor();
+            let y = y - y.floor();
+
+            return *c00 * (1.0 - x) * (1.0 - y)
+                + *c10 * x * (1.0 - y)
+                + *c01 * (1.0 - x) * y
+                + *c11 * x * y;
+        }
+        *self.get_pixel_color(x as usize, y as usize)
+    }
+
+    #[inline]
+    fn get_pixel_color(&self, x: usize, y: usize) -> &Color {
+        &self.pixel_colors[self.coordinates_to_index(x, y)]
+    }
+
+    #[inline]
+    fn coordinates_to_index(&self, x: usize, y: usize) -> usize {
+        y * self.width as usize + x
+    }
+}
+
+impl Scatter for TextureMaterial {
+    fn scatter(&self, _ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
+        let mut scatter_direction = intersection.normal + Vector3::random_unit_vector();
+
+        if scatter_direction.near_zero() {
+            scatter_direction = intersection.normal;
+        }
+
+        let scattered = Ray::new(intersection.point, scatter_direction);
+
+        if intersection.u.is_none() || intersection.v.is_none() {
+            return None;
+        }
+
+        let attenuation = self.get_albedo(intersection.u.unwrap(), intersection.v.unwrap());
+
+        Some((Some(scattered), attenuation))
     }
 }
 
