@@ -196,7 +196,7 @@ pub struct TextureMaterial {
 impl TextureMaterial {
     fn get_albedo(&self, u: f64, v: f64) -> Color {
         let x = self.width * u;
-        let y = self.height * v;
+        let y = self.height - (self.height * v);
         if x % 1.0 != 0.0 || y % 1.0 != 0.0 {
             let x_top = x.ceil() as usize;
             let y_top = y.ceil() as usize;
@@ -234,7 +234,7 @@ impl Scatter for TextureMaterial {
     fn scatter(&self, _ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
         let mut scatter_direction = intersection.normal + Vector3::random_unit_vector();
 
-        if scatter_direction.near_zero() {
+        if scatter_direction.near_zero() || intersection.normal.dot(&scatter_direction) <= 0.0 {
             scatter_direction = intersection.normal;
         }
 

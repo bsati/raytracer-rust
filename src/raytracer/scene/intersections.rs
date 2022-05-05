@@ -175,9 +175,9 @@ impl Intersectable for Mesh {
                     t,
                 );
                 if let Some(tuv_idx) = triangle.uv_idx {
-                    let (u1, v1) = self.uvs[tuv_idx[0]];
-                    let (u2, v2) = self.uvs[tuv_idx[1]];
-                    let (u3, v3) = self.uvs[tuv_idx[2]];
+                    let (u1, v1) = self.uvs[tuv_idx[1]];
+                    let (u2, v2) = self.uvs[tuv_idx[2]];
+                    let (u3, v3) = self.uvs[tuv_idx[0]];
                     info.u = Some(a * u1 + b * u2 + (1.0 - a - b) * u3);
                     info.v = Some(a * v1 + b * v2 + (1.0 - a - b) * v3);
                 }
