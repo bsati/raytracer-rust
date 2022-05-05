@@ -20,6 +20,8 @@ pub struct IntersectionInfo<'mat> {
     pub normal: Vector3,
     pub material: &'mat Material,
     pub t: f64,
+    pub u: Option<f64>,
+    pub v: Option<f64>,
 }
 
 impl IntersectionInfo<'_> {
@@ -29,6 +31,8 @@ impl IntersectionInfo<'_> {
             normal,
             material,
             t,
+            u: None,
+            v: None,
         }
     }
 }
@@ -164,12 +168,20 @@ impl Intersectable for Mesh {
             }
             let normal = ab.cross(&ac).normalized();
             if result.is_none() || result.unwrap().t > t {
-                result = Some(IntersectionInfo::new(
+                let mut info = IntersectionInfo::new(
                     ray.at_timestep(t),
                     normal,
                     &self.materials[triangle.material_idx],
                     t,
-                ));
+                );
+                if let Some(tuv_idx) = triangle.uv_idx {
+                    let (u1, v1) = self.uvs[tuv_idx[1]];
+                    let (u2, v2) = self.uvs[tuv_idx[2]];
+                    let (u3, v3) = self.uvs[tuv_idx[0]];
+                    info.u = Some(a * u1 + b * u2 + (1.0 - a - b) * u3);
+                    info.v = Some(a * v1 + b * v2 + (1.0 - a - b) * v3);
+                }
+                result = Some(info);
             }
         }
 
