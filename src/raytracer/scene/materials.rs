@@ -231,7 +231,11 @@ impl TextureMaterial {
 }
 
 impl Scatter for TextureMaterial {
-    fn scatter(&self, _ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
+    fn scatter(&self, ray: &Ray, intersection: &IntersectionInfo) -> Option<(Option<Ray>, Color)> {
+        let attenuation = self.get_albedo(intersection.u.unwrap(), intersection.v.unwrap());
+        if ray.direction.dot(&intersection.normal) > 0.0 {
+            return Some((None, attenuation));
+        }
         let mut scatter_direction = intersection.normal + Vector3::random_unit_vector();
 
         if scatter_direction.near_zero() || intersection.normal.dot(&scatter_direction) <= 0.0 {
@@ -243,8 +247,6 @@ impl Scatter for TextureMaterial {
         if intersection.u.is_none() || intersection.v.is_none() {
             return None;
         }
-
-        let attenuation = self.get_albedo(intersection.u.unwrap(), intersection.v.unwrap());
 
         Some((Some(scattered), attenuation))
     }
